@@ -1,0 +1,25 @@
+{
+  "name": "discord-server-backup-tool-rewrite",
+  "version": "1.0.0",
+  "description": "helps you backup your precious servers",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "discord.js",
+    "discord",
+    "backup",
+    "andreweathan",
+    "mariluu"
+  ],
+  "author": "andreweathan/mariluu",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "dependencies": {
+    "discord.js-selfbot-v13": "^2.9.12",
+    "dotenv": "^16.0.3",
+    "readline-sync": "^1.4.10",
+    "sqlite3": "^5.1.2"
+  }
+}
