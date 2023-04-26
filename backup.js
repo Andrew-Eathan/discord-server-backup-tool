@@ -2,6 +2,7 @@ import SQL from "./sql.js"
 import fs from "fs"
 import path from "path"
 import fetch from "node-fetch"
+import Discord from "discord.js-selfbot-v13";
 
 let spins = ['/', '-', '\\', '|']
 let spin_idx = 0
@@ -19,7 +20,8 @@ async function GetLinkData(link) {
 
 async function OpenDatabase(folder, name) {
     print("Opening " + name + " database...")
-    return await SQL.FileOpen(path.resolve(folder, name + ".db"))
+	console.log(path.resolve(folder, name + ".db"))
+    return await SQL.OpenFile(path.resolve(folder, name + ".db"))
 }
 
 export default async function startBackup(bot, selGuild, selChans, chosenOptions) {
@@ -30,10 +32,11 @@ export default async function startBackup(bot, selGuild, selChans, chosenOptions
 	// then continue to the next channel, and go on until the end, where we save this information
 
     let folder = Clean4FS(selGuild.name)
-    fs.mkdirSync(folder)
+    if (!fs.existsSync(folder))
+		fs.mkdirSync(folder)
 
-    let auxdb = await OpenDatabase("backupinfo");
-    let messages = await OpenDatabase("messages")
+    let auxdb = await OpenDatabase(folder, "backupinfo");
+    let messages = await OpenDatabase(folder, "messages")
 
     let roles = false;
     if (chosenOptions.save_roles) {
@@ -72,7 +75,31 @@ export default async function startBackup(bot, selGuild, selChans, chosenOptions
         serverinfo.Execute("CREATE TABLE IF NOT EXISTS channels (name text, type text, id text, position integer, rawposition integer, created integer, threadarchivetime int, topic text, slowmode integer, bitrate integer, rtcregion text, userlimit int)")
 
         for (let ch of selChans) {
-            serverinfo.Execute("INSERT INTO channels ")
+			let savekeys = [];
+			let savedata = [];
+			let savemarks = [];
+
+			savekeys.push("name"); savedata.push(ch.name);
+			savekeys.push("type"); savedata.push(ch.type);
+			savekeys.push("id"); savedata.push(ch.id);
+			savekeys.push("position"); savedata.push(ch.position);
+			savekeys.push("rawposition"); savedata.push(ch.rawPosition);
+			savekeys.push("created"); savedata.push(ch.type);
+			savekeys.push("topic"); savedata.push(ch.type);
+			savekeys.push("bitrate"); savedata.push(ch.type);
+			savekeys.push("rtcregion"); savedata.push(ch.type);
+			savekeys.push("userlimit"); savedata.push(ch.type);
+
+			console.log(ch)
+
+			switch (ch.type) {
+				case ChannelType.Text: {
+					savekeys.push("slowmode"); savedata.push(ch.type);
+					savekeys.push("threadarchivetime"); savedata.push(ch.type);
+				} break;
+			}
+
+            serverinfo.Execute(`INSERT INTO channels (${savekeys.join(", ")}) VALUES (${Array(savedata.length).fill("?").join(", ")})`)
         }
     }
 }
