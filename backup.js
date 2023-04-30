@@ -6,8 +6,8 @@ import Discord from "discord.js-selfbot-v13";
 
 let spins = ['/', '-', '\\', '|']
 let spin_idx = 0
-function print(data, char) {
-    process.stdout.write(`${spins[spin_idx++]} ${data}           \r`)
+function print(data, char, inplace) {
+    process.stdout.write(`${spins[spin_idx++]} ${data}           \r` + (inplace ? "" : "\n"))
 }
 
 const Clean4FS = str => str.toLowerCase().replaceAll(/[^a-zA-Z0-9\(\)\s\-]+/gm, "_");
@@ -65,16 +65,18 @@ export default async function startBackup(bot, selGuild, selChans, chosenOptions
 
     let zip = false;
     if (chosenOptions.save_readable) {
-        zip = new JSZip();
+        //zip = new JSZip();
     }
 
     if (serverinfo) {
         print("Saving server information...")
 
-        serverinfo.Execute("CREATE TABLE IF NOT EXISTS serverinfo (type text, data text)")
-        serverinfo.Execute("CREATE TABLE IF NOT EXISTS channels (name text, type text, id text, position integer, rawposition integer, created integer, threadarchivetime int, topic text, slowmode integer, bitrate integer, rtcregion text, userlimit int)")
+        await serverinfo.Execute("CREATE TABLE IF NOT EXISTS serverinfo (type text, data text)")
+        await serverinfo.Execute("CREATE TABLE IF NOT EXISTS channels (name text, type text, id text, position integer, rawposition integer, created integer, threadarchivetime int, topic text, slowmode integer, bitrate integer, rtcregion text, userlimit int)")
 
         for (let ch of selChans) {
+            print("Saving details for #" + ch.name)
+
 			let savekeys = [];
 			let savedata = [];
 			let savemarks = [];
@@ -84,23 +86,30 @@ export default async function startBackup(bot, selGuild, selChans, chosenOptions
 			savekeys.push("id"); savedata.push(ch.id);
 			savekeys.push("position"); savedata.push(ch.position);
 			savekeys.push("rawposition"); savedata.push(ch.rawPosition);
-			savekeys.push("created"); savedata.push(ch.type);
-			savekeys.push("topic"); savedata.push(ch.type);
-			savekeys.push("bitrate"); savedata.push(ch.type);
-			savekeys.push("rtcregion"); savedata.push(ch.type);
-			savekeys.push("userlimit"); savedata.push(ch.type);
+			savekeys.push("created"); savedata.push(ch.createdAt);
+			savekeys.push("topic"); savedata.push(ch.topic);
 
-			console.log(ch)
+			//console.log(ch)
 
 			switch (ch.type) {
-				case ChannelType.Text: {
+				case "GUILD_TEXT": {
 					savekeys.push("slowmode"); savedata.push(ch.type);
 					savekeys.push("threadarchivetime"); savedata.push(ch.type);
 				} break;
+                case "GUILD_VOICE": {
+		        	savekeys.push("bitrate"); savedata.push(ch.bitrate);
+		        	savekeys.push("rtcregion"); savedata.push(ch.rtcRegion);
+        			savekeys.push("userlimit"); savedata.push(ch.userLimit);
+                } break;
 			}
 
-            serverinfo.Execute(`INSERT INTO channels (${savekeys.join(", ")}) VALUES (${Array(savedata.length).fill("?").join(", ")})`)
+            await serverinfo.Execute(`INSERT INTO channels (${savekeys.join(", ")}) VALUES (${Array(savedata.length).fill("?").join(", ")})`, savedata)
+
         }
+
+        print("Saved channels!")
+
+
     }
 }
 
