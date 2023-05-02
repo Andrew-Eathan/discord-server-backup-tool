@@ -28,8 +28,6 @@ SQL.OpenFile = filename => {
                 return;
             }
 
-            console.log("Started SQLite3 database!", import.meta.url)
-
             obj.IsValid = true
 
             obj.Execute = async (query, params) => {

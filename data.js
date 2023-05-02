@@ -4,15 +4,7 @@ export const localedata = [
 ]
 export let chosen_options = {
 	"save_server_data": {
-		text: "Save server information? (name, data, icon, moderation, etc)",
-		default: true,
-		accepted: [
-			"y", "n"
-		],
-		type: "bool"
-	},
-	"save_members": {
-		text: "Save members?",
+		text: "Save server information? (name, data, icon, moderation, members, etc)",
 		default: true,
 		accepted: [
 			"y", "n"
@@ -20,20 +12,20 @@ export let chosen_options = {
 		type: "bool"
 	},
 	"save_members_images": {
-		text: "Save the avatars and banners of members? Note: This will save them in a lower quality to avoid large export sizes!\n (y)es, (n)o, yes but in (f)ull quality",
-		default: "n",
+		text: "Save the avatars and banners of members? Type one of y, n, or f:\n(y)es in low quality, yes in (f)ull quality, (n)o",
+		default: "y",
 		accepted: [
 			"y", "n", "f"
 		],
 		type: "choice"
 	},
-	"save_roles": {
-		text: "Save roles?",
-		default: true,
+	"save_emoji_images": {
+		text: "Save custom server emoji images? Type one of y, n, or f:\n(y)es in low quality, yes in (f)ull quality, (n)o",
+		default: "y",
 		accepted: [
-			"y", "n"
+			"y", "n", "f"
 		],
-		type: "bool"
+		type: "choice"
 	},
 	"save_member_message_count": {
 		text: "Save members message count?",

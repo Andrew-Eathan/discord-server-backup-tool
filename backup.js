@@ -3,28 +3,32 @@ import fs from "fs"
 import path from "path"
 import fetch from "node-fetch"
 import Discord from "discord.js-selfbot-v13";
+import JSZip from "jszip";
+import { inspect } from "util";
 
 let spins = ['/', '-', '\\', '|']
 let spin_idx = 0
 function print(data, char, inplace) {
     process.stdout.write(`${spins[spin_idx++]} ${data}           \r` + (inplace ? "" : "\n"))
+	spin_idx = spin_idx % spins.length;
 }
 
-const Clean4FS = str => str.toLowerCase().replaceAll(/[^a-zA-Z0-9\(\)\s\-]+/gm, "_");
+const Clean4FS = str => str.toLowerCase().replaceAll(/\_/gm, "").replaceAll(/[^a-zA-Z0-9\(\)\s\-]+/gm, "_");
 
 async function GetLinkData(link) {
-	let res = await fetch(link)
+	let res = await fetch(link).catch(e => null)
+	if (!res) return null;
+
 	let buffer = await res.buffer()
 	return buffer
 }
 
 async function OpenDatabase(folder, name) {
     print("Opening " + name + " database...")
-	console.log(path.resolve(folder, name + ".db"))
     return await SQL.OpenFile(path.resolve(folder, name + ".db"))
 }
 
-export default async function startBackup(bot, selGuild, selChans, chosenOptions) {
+export default async function startBackup(bot, selGuild, selChans, allCategories, allChannels, options) {
 	// explanation:
 	// we start with no previous chunk so we fetch the first ~100 messages (api limit)
 	// then we find the ID of the earliest message in this chunk and assign it to prevChunk so we know where to continue next
@@ -32,85 +36,319 @@ export default async function startBackup(bot, selGuild, selChans, chosenOptions
 	// then continue to the next channel, and go on until the end, where we save this information
 
     let folder = Clean4FS(selGuild.name)
-    if (!fs.existsSync(folder))
+
+    if (fs.existsSync(folder))
+	{
+		let add = 1;
+
+		while (fs.existsSync(folder + "_" + add)) {
+			add++;
+		}
+
+		folder = folder + "_" + add;
 		fs.mkdirSync(folder)
+	} else fs.mkdirSync(folder);
 
     let auxdb = await OpenDatabase(folder, "backupinfo");
-    let messages = await OpenDatabase(folder, "messages")
+    let messages = await OpenDatabase(folder, "messages");
 
+    let serverinfo = false;
     let roles = false;
-    if (chosenOptions.save_roles) {
-        roles = await OpenDatabase(folder, "roles")
-    }
-
     let members = false;
-    if (chosenOptions.save_members) {
+    if (options.save_server_data) {
+        serverinfo = await OpenDatabase(folder, "serverinfo")
+        roles = await OpenDatabase(folder, "roles")
         members = await OpenDatabase(folder, "members")
     }
 
-    let memberimages = false;
-    if (chosenOptions.save_members_images) {
-        memberimages = await OpenDatabase(folder, "memberimages")
-    }
-
-    let serverinfo = false;
-    if (chosenOptions.save_server_data) {
-        serverinfo = await OpenDatabase(folder, "serverinfo")
-    }
-
     let messagecounts = false;
-    if (chosenOptions.save_members) {
+    if (options.save_members) {
         messagecounts = await OpenDatabase(folder, "messagecounts")
     }
 
     let zip = false;
-    if (chosenOptions.save_readable) {
-        //zip = new JSZip();
+    if (options.save_readable) {
+        zip = new JSZip();
     }
 
     if (serverinfo) {
         print("Saving server information...")
-
-        await serverinfo.Execute("CREATE TABLE IF NOT EXISTS serverinfo (type text, data text)")
-        await serverinfo.Execute("CREATE TABLE IF NOT EXISTS channels (name text, type text, id text, position integer, rawposition integer, created integer, threadarchivetime int, topic text, slowmode integer, bitrate integer, rtcregion text, userlimit int)")
-
-        for (let ch of selChans) {
-            print("Saving details for #" + ch.name)
-
-			let savekeys = [];
-			let savedata = [];
-			let savemarks = [];
-
-			savekeys.push("name"); savedata.push(ch.name);
-			savekeys.push("type"); savedata.push(ch.type);
-			savekeys.push("id"); savedata.push(ch.id);
-			savekeys.push("position"); savedata.push(ch.position);
-			savekeys.push("rawposition"); savedata.push(ch.rawPosition);
-			savekeys.push("created"); savedata.push(ch.createdAt);
-			savekeys.push("topic"); savedata.push(ch.topic);
-
-			//console.log(ch)
-
-			switch (ch.type) {
-				case "GUILD_TEXT": {
-					savekeys.push("slowmode"); savedata.push(ch.type);
-					savekeys.push("threadarchivetime"); savedata.push(ch.type);
-				} break;
-                case "GUILD_VOICE": {
-		        	savekeys.push("bitrate"); savedata.push(ch.bitrate);
-		        	savekeys.push("rtcregion"); savedata.push(ch.rtcRegion);
-        			savekeys.push("userlimit"); savedata.push(ch.userLimit);
-                } break;
-			}
-
-            await serverinfo.Execute(`INSERT INTO channels (${savekeys.join(", ")}) VALUES (${Array(savedata.length).fill("?").join(", ")})`, savedata)
-
-        }
-
-        print("Saved channels!")
-
-
+        await SaveServerInfo(serverinfo, selGuild, allChannels, allCategories, options, zip);
+		await SaveRoles(roles, selGuild, zip);
+		await SaveMembers(members, selGuild, options, zip);
     }
+}
+
+async function SaveRoles(roles, selGuild, zip) {
+	print("Saving roles...");
+
+	// dont forget to create a new table with members list for each role
+	await roles.Execute("CREATE TABLE IF NOT EXISTS roles (id text, name text, createdTimestamp integer, hexColor text, unicodeEmoji text, icon text)");
+	
+}
+
+async function SaveMembers(members, selGuild, options, zip) {
+	print("Saving members...")
+
+	await members.Execute("CREATE TABLE IF NOT EXISTS members (id text, username text, discriminator text, tag text, nickname text, createdTimestamp integer, bot integer, system integer, communicationDisabledTimestamp integer, displayHexColor text, joinedTimestamp integer, pending integer, premiumSinceTimestamp integer, avatar text, banner text)")
+
+	let savekeys = [
+		"id",
+		"username",
+		"discriminator",
+		"tag",
+		"nickname",
+		"createdTimestamp",
+		"bot",
+		"system",
+		"communicationDisabledTimestamp",
+		"displayHexColor",
+		"joinedTimestamp",
+		"pending",
+		"premiumSinceTimestamp"
+	]
+
+	let gmembers = await selGuild.members.fetch();
+	let idx = 0
+	
+	for (let pairs of gmembers) {
+		let member = pairs[1];
+		let savedata = [];
+	
+		for (let savekey of savekeys) {
+			let data = member[savekey];
+			if (typeof data == "undefined" || typeof data == "null") data = member?.user[savekey];
+
+			savedata.push(data);
+		}
+
+		if (options.save_members_images != "n") {
+			// force fetch so that the avatar and banner is available
+			await member?.user.fetch();
+
+			let avatarurl = member?.user.avatarURL({ format: "png" })
+			if (avatarurl) {
+				let rawimage = await GetLinkData(avatarurl);
+				savedata.push(rawimage?.toString("base64"));
+			} else savedata.push(null);
+			
+			let bannerurl = member?.user.bannerURL({ format: "png" })
+			if (bannerurl) {
+				let rawimage = await GetLinkData(bannerurl);
+				savedata.push(rawimage?.toString("base64"));
+			} else savedata.push(null);
+		} else {
+			savedata.push(null);
+			savedata.push(null);
+		}
+
+		await members.Execute(`INSERT INTO members (${savekeys.join(", ")}, avatar, banner) VALUES (${Array(savedata.length).fill("?").join(", ")})`, savedata);
+		print(`${++idx}/${gmembers.size} done`);
+	}
+
+	print("Saved members!")
+}
+
+async function SaveServerInfo(serverinfo, selGuild, allChannels, allCategories, options, zip) {
+	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS serverinfo (type text, data text)")
+	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS bans (id text, user text, reason text)")
+	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS invites (code text, temporary integer, maxAge integer, uses integer, maxUses integer, inviterId integer, createdAt integer, expiresAt integer, url text)")
+	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS emojis (id text, name text, animated integer, authorId text, createdAt integer, identifier text, requiresColons integer, url text, image text)")
+	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS channels (name text, type text, id text, parentId text, position integer, rawPosition integer, createdAt integer, nsfw integer, lastMessageId text, topic text, rateLimitPerUser integer, bitrate integer, rtcRegion text, userLimit integer)")
+
+	print("Saving server settings...");
+
+	// save server-specific info
+	let svsave = {}
+	let sv_savekeys = [
+		"afkChannelId",
+		"afkTimeout",
+		"createdTimestamp",
+		"description",
+		"explicitContentFilter",
+		"verificationLevel",
+		"defaultMessageNotifications",
+		"id",
+		"maximumBitrate",
+		"maximumMembers",
+		"maximumPresences",
+		"maxStageVideoChannelUsers",
+		"maxVideoChannelUsers",
+		"memberCount",
+		"mfaLevel",
+		"name",
+		"nameAcronym",
+		"nsfwLevel",
+		"ownerId",
+		"partnered",
+		"preferredLocale",
+		"premiumProgressBarEnabled",
+		"premiumSubscriptionCount",
+		"premiumTier",
+		"publicUpdatesChannelId",
+		"rulesChannelId",
+		"systemChannelId",
+		"verificationLevel",
+		"verified",
+		"widgetChannelId",
+		"widgetEnabled"
+	]
+
+	try {
+		let vanityData = await selGuild.fetchVanityData();
+		svsave["vanityURLCode"] = vanityData.code;
+		svsave["vanityURLUses"] = vanityData.uses;
+	} catch(e) {
+		print("Couldn't save vanity invite data, server probably doesn't have a custom invite. (" + e + ")");
+	}
+
+	for (let savekey of sv_savekeys) {
+		svsave[savekey] = selGuild[savekey];
+	}
+
+	svsave["features"] = JSON.stringify(selGuild.features);
+
+	let iconurl = selGuild.iconURL({ format: "png" })
+	if (iconurl) {
+		let rawimage = await GetLinkData(iconurl);
+		svsave["icon"] = rawimage?.toString("base64");
+	}
+	
+	let bannerurl = selGuild.bannerURL({ format: "png" })
+	if (bannerurl) {
+		let rawimage = await GetLinkData(bannerurl);
+		svsave["banner"] = rawimage?.toString("base64");
+	}
+
+	try {
+		let bans = await selGuild.bans.fetch();
+
+		for (let id in bans) {
+			await serverinfo.Execute("INSERT INTO bans (id, user, reason) VALUES (?, ?, ?)", [
+				id,
+				bans[id].user,
+				bans[id].reason
+			]);
+		}
+	} catch(e) {
+		print("Couldn't save bans list, your account probably doesn't have the permission to see them. (" + e + ")");
+	}
+
+	let emojis = await selGuild.emojis.fetch()
+	for (let pairs in emojis) {
+		let emoji = pairs[1];
+		let imagedata = null;
+
+		if (options.save_emoji_images)
+			image = await GetLinkData()
+		
+		await serverinfo.Execute("INSERT INTO emojis (id, name, animated, authorId, createdAt, identifier, requiresColons, url, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+			emoji?.id, // why are all of these nullable wtf discord
+			emoji?.name,
+			emoji?.animated, 
+			emoji?.author?.id,
+			emoji?.createdTimestamp,
+			emoji.identifier, // except this?? what
+			emoji?.requiresColons, 
+			emoji?.url,
+			imagedata
+		]);
+	}
+
+	try {
+		let invites = await selGuild.invites.fetch();
+		
+		// indexed by code
+		for (let code in invites) {
+			let invite = invites[code];
+
+			await serverinfo.Execute("INSERT INTO invites (code, temporary, maxAge, uses, maxUses, inviterId, createdat, expiresat, url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+				invite.code,
+				invite.temporary,
+				invite.maxAge,
+				invite.uses,
+				invite.maxUses,
+				invite.inviterId,
+				invite.createdAt,
+				invite.expiresat,
+				invite.url
+			])
+		}
+	} catch (e) {
+		print("Couldn't save invites, your account probably doesn't have the permission to see them. (" + e + ")");
+	}
+
+	for (let k in svsave) {
+		await serverinfo.Execute("INSERT INTO serverinfo (type, data) VALUES (?, ?)", [k, svsave[k]]);
+	}
+
+	print("Saved server settings!");
+
+	// save list of channels and each of the channels' data
+	for (let pairs of allChannels) {
+		let ch = pairs[1];
+
+		print("Saving settings for #" + ch.name)
+
+		let savekeys = [];
+		let savedata = [];
+
+		savekeys.push("name"); savedata.push(ch.name);
+		savekeys.push("type"); savedata.push(ch.type);
+		savekeys.push("id"); savedata.push(ch.id);
+		savekeys.push("parentId"); savedata.push(ch.parentId);
+		savekeys.push("position"); savedata.push(ch.position);
+		savekeys.push("rawPosition"); savedata.push(ch.rawPosition);
+		savekeys.push("createdAt"); savedata.push(ch.createdAt);
+		savekeys.push("nsfw"); savedata.push(ch.nsfw ? 1 : 0);
+		savekeys.push("topic"); savedata.push(ch.topic);
+		savekeys.push("lastMessageId"); savedata.push(ch.lastMessageId);
+
+		switch (ch.type) {
+			case "GUILD_TEXT": {
+				savekeys.push("rateLimitPerUser"); savedata.push(ch.rateLimitPerUser);
+			} break;
+			case "GUILD_VOICE": {
+				savekeys.push("bitrate"); savedata.push(ch.bitrate);
+				savekeys.push("rtcRegion"); savedata.push(ch.rtcRegion);
+				savekeys.push("userLimit"); savedata.push(ch.userLimit);
+			} break;
+		}
+
+		await serverinfo.Execute(`INSERT INTO channels (${savekeys.join(", ")}) VALUES (${Array(savedata.length).fill("?").join(", ")})`, savedata)
+
+		if (zip) {
+			let svinfo = zip.folder("serverinfo");
+			
+			svinfo.file("")
+		}
+	}
+
+	print("Saved channels!")
+
+	let lookupCategories = {}
+	for (let cat of allCategories) {
+		lookupCategories[cat.id] = cat;
+	}
+
+	let selCategories = {}
+	for (let ch of allChannels) {
+		if (ch.parentId && !selCategories[ch.parentId] && lookupCategories[ch.parentId]) {
+			selCategories[ch.parentId] = lookupCategories[ch.parentId];
+		}
+	}
+
+	print("Saving categories...");
+
+	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS categories (name text, type text, id text, position integer, rawposition integer, created integer)")
+
+	for (let cat of Object.values(selCategories)) {
+		await serverinfo.Execute("INSERT INTO categories (name, type, id, position, rawposition, created) VALUES (?, ?, ?, ?, ?, ?)", [
+			cat.name, cat.type, cat.id, cat.position, cat.rawPosition, cat.createdAt
+		])
+	}
+
+	print("Saved all server-related info!");
 }
 
 /*

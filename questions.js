@@ -14,18 +14,19 @@ export default async bot => {
 	bot.on("ready", async _ => {
 		console.log("Loaded in as " + bot.user.tag + "!")
 
-		await bot.guilds.fetch();
-		let dguilds = bot.guilds.cache;
+		let dguilds = await bot.guilds.fetch();
 		let list = []
 		let selguilds = []
 
 		console.log("Select a guild from your list! Type the number to the left of its name.")
+
 		let k = 0;
-		dguilds.forEach(guild => {
+		for (let pairs of dguilds) {
+			let guild = await pairs[1].fetch();
 			k++;
-			console.log(`${k}: ${guild.name} (${guild.members.cache.size} member(s))`)
+			console.log(`${k}: ${guild.name} (${guild.memberCount} member(s))`)
 			list[k] = guild
-		})
+		}
 
 		selGuild = list[cmdGetNumber(val => isValid(list[val]))]
 
@@ -39,7 +40,7 @@ export default async bot => {
 		console.log("- Type \"done\" when you are done selecting channels, to move onto the next step.")
 		console.log()
 
-		await selGuild.channels.fetch();
+		let allChannels = await selGuild.channels.fetch();
 
 		let fancyChList = {} // future me, organise this array like this:
 		let fancyCatList = []
@@ -51,7 +52,8 @@ export default async bot => {
 
 		selGuild.channels.cache.forEach(ch => {
 			switch (ch.type) {
-				case "GUILD_TEXT": {
+				case "GUILD_TEXT":
+				case "GUILD_VOICE": {
 					let key = ch?.parentId ?? "noparent"
 					fancyChList[key] = fancyChList[key] ?? []
 					fancyChList[key].push(ch)
@@ -81,11 +83,12 @@ export default async bot => {
 		while (!doneChSel) {
 			for (let i = 0; i < fancyCatList.length; i++) {
 				let cat = fancyCatList[i]
-				let chans = fancyChList[cat.id]
-				console.log(`category ${i + 1}: ${cat.name} (${chans.length} channel(s))`)
+				let chans = fancyChList[cat.id] ?? {}
+
+				console.log(`category ${i + 1}: ${cat.name} (${chans?.length ?? 0} channel(s))`)
 
 				for (let j = 0; j < chans.length; j++) {
-					console.log(`- ${i + 1}-${j + 1}: #${chans[j].name}`)
+					console.log(`- ${i + 1}-${j + 1}: #${chans[j].name} ${chans[j].type == "GUILD_VOICE" ? "(VOICE CHANNEL)" : ""}`)
 				}
 			}
 
@@ -197,6 +200,6 @@ export default async bot => {
         console.log()
         console.log("Backup will begin in 3 seconds...")
 
-        setTimeout(_ => startBackup(bot, selGuild, selChans, chosen_options), 3000)
+        setTimeout(_ => startBackup(bot, selGuild, selChans, fancyCatList, allChannels, chosen_options), 3000)
 	})
 }
