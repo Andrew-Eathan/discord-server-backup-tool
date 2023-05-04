@@ -4,7 +4,7 @@ import path from "path"
 import fetch from "node-fetch"
 import Discord from "discord.js-selfbot-v13";
 import JSZip from "jszip";
-import { inspect } from "util";
+import { message_save_keys } from "./data.js";
 
 let spins = ['/', '-', '\\', '|']
 let spin_idx = 0
@@ -98,8 +98,20 @@ export default async function startBackup(bot, selGuild, selChans, allCategories
 async function SaveMessages(messages, selGuild, selChans, options, zip) {
     print("Saving messages...");
 
+	for (let chan in selChans) {
+		let savekeys = [];
+		let savedata = [];
 
-    await messages.Execute("CREATE TABLE IF NOT EXISTS ")
+		for (let i = 0; i < message_save_keys.length; i++) {
+			savekeys.push(message_save_keys[i]);
+			savedata.push(chan[message_save_keys[i]]);
+		}
+
+		savekeys.push("activity", JSON.stringify(chan.activity));
+
+		let qmarks = Array(savekeys.length).fill("?").join(", ");
+		await messages.Execute(`CREATE TABLE IF NOT EXISTS ? (${qmarks}) VALUES ${qmarks}`, savedata);
+	}
 
     let prevID;
 
