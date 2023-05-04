@@ -148,11 +148,13 @@ export default async bot => {
 		}
 
 		console.log(selChans.length + " channels selected!")
+        console.log()
         console.log("Now, specify some options for the backup process.")
         console.log("Type y/n, or an option depending on the question:")
 
         Object.keys(chosen_options).forEach(key => {
             let option = chosen_options[key]
+            console.log()
             console.log(option.text);
 
             while (true) {

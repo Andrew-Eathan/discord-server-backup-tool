@@ -20,13 +20,29 @@ export let chosen_options = {
 		type: "choice"
 	},
 	"save_emoji_images": {
-		text: "Save custom server emoji images? Type one of y, n, or f:\n(y)es in low quality, yes in (f)ull quality, (n)o",
+		text: "Save custom server emoji images? Type y, n, or f:\n(y)es in low quality, yes in (f)ull quality, (n)o",
 		default: "y",
 		accepted: [
 			"y", "n", "f"
 		],
 		type: "choice"
 	},
+	"save_role_images": {
+		text: "Save role icon images? Type y, n, or f:\n(y)es in low quality, yes in (f)ull quality, (n)o",
+		default: "y",
+		accepted: [
+			"y", "n", "f"
+		],
+		type: "choice"
+	},
+	"save_member_message_count": {
+		text: "Save members message count?",
+		default: true,
+		accepted: [
+			"y", "n"
+		],
+		type: "bool"
+    },
 	"save_member_message_count": {
 		text: "Save members message count?",
 		default: true,

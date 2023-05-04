@@ -15,6 +15,11 @@ function print(data, char, inplace) {
 
 const Clean4FS = str => str.toLowerCase().replaceAll(/\_/gm, "").replaceAll(/[^a-zA-Z0-9\(\)\s\-]+/gm, "_");
 
+// these are later modified to fetch a low/high size based on the image size
+let membersFetchOptions = { format: "png" }
+let emojiFetchOptions = { format: "png" }
+let roleFetchOptions = { format: "png" }
+
 async function GetLinkData(link) {
 	let res = await fetch(link).catch(e => null)
 	if (!res) return null;
@@ -34,6 +39,15 @@ export default async function startBackup(bot, selGuild, selChans, allCategories
 	// then we find the ID of the earliest message in this chunk and assign it to prevChunk so we know where to continue next
 	// we continue this until we hit <100 messages in a fetch, which means we've reached the channel's end
 	// then continue to the next channel, and go on until the end, where we save this information
+
+    if (options.save_members_images == "y")
+        membersFetchOptions.size = 128;
+
+    if (options.save_emoji_images == "y")
+        emojiFetchOptions.size = 128;
+
+    if (options.save_role_images == "y")
+        roleFetchOptions.size = 128;
 
     let folder = Clean4FS(selGuild.name)
 
@@ -74,17 +88,67 @@ export default async function startBackup(bot, selGuild, selChans, allCategories
     if (serverinfo) {
         print("Saving server information...")
         await SaveServerInfo(serverinfo, selGuild, allChannels, allCategories, options, zip);
-		await SaveRoles(roles, selGuild, zip);
+		await SaveRoles(roles, selGuild, options, zip);
 		await SaveMembers(members, selGuild, options, zip);
     }
+
+    await SaveMessages(messages, selGuild, selChans, options, zip);
 }
 
-async function SaveRoles(roles, selGuild, zip) {
+async function SaveMessages(messages, selGuild, selChans, options, zip) {
+    print("Saving messages...");
+
+
+    await messages.Execute("CREATE TABLE IF NOT EXISTS ")
+
+    let prevID;
+
+}
+
+async function SaveRoles(roles, selGuild, options, zip) {
 	print("Saving roles...");
 
 	// dont forget to create a new table with members list for each role
-	await roles.Execute("CREATE TABLE IF NOT EXISTS roles (id text, name text, createdTimestamp integer, hexColor text, unicodeEmoji text, icon text)");
-	
+	await roles.Execute("CREATE TABLE IF NOT EXISTS roles (id text, name text, createdTimestamp integer, hoist integer, mentionable integer, tags string, position integer, rawPosition integer, hexColor text, unicodeEmoji text, icon text)");
+
+    let droles = await selGuild.roles.fetch();
+    let idx = 0;
+    for (let pairs of droles) {
+        let role = pairs[1];
+        let icondata = null;
+
+        if (options.save_role_images != "n") {
+            let url = role.iconURL(roleFetchOptions);
+            if (url) {
+                icondata = await GetLinkData(url);
+            }
+        }
+
+        await roles.Execute("INSERT INTO roles (id, name, createdTimestamp, hoist, mentionable, tags, position, rawPosition, hexColor, unicodeEmoji, icon) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+            role.id,
+            role.name,
+            role.createdTimestamp,
+            role.hoist,
+            role.mentionable,
+            JSON.stringify(role.tags),
+            role.position,
+            role.rawPosition,
+            role.hexColor,
+            role.unicodeEmoji,
+            icondata
+        ])
+
+        let qualitytext = "";
+
+        switch (options.save_roles_images) {
+            case "y": qualitytext = " (low-res image)"; break;
+            case "f": qualitytext = " (high-res image)"; break;
+        }
+
+        print(`${++idx}/${droles.size} roles saved${qualitytext} - ${role.name ?? "unnamed"}`)
+    }
+
+    print("Saved roles!")
 }
 
 async function SaveMembers(members, selGuild, options, zip) {
@@ -110,11 +174,11 @@ async function SaveMembers(members, selGuild, options, zip) {
 
 	let gmembers = await selGuild.members.fetch();
 	let idx = 0
-	
+
 	for (let pairs of gmembers) {
 		let member = pairs[1];
 		let savedata = [];
-	
+
 		for (let savekey of savekeys) {
 			let data = member[savekey];
 			if (typeof data == "undefined" || typeof data == "null") data = member?.user[savekey];
@@ -126,13 +190,13 @@ async function SaveMembers(members, selGuild, options, zip) {
 			// force fetch so that the avatar and banner is available
 			await member?.user.fetch();
 
-			let avatarurl = member?.user.avatarURL({ format: "png" })
+			let avatarurl = member?.user.avatarURL(membersFetchOptions)
 			if (avatarurl) {
 				let rawimage = await GetLinkData(avatarurl);
 				savedata.push(rawimage?.toString("base64"));
 			} else savedata.push(null);
-			
-			let bannerurl = member?.user.bannerURL({ format: "png" })
+
+			let bannerurl = member?.user.bannerURL(membersFetchOptions)
 			if (bannerurl) {
 				let rawimage = await GetLinkData(bannerurl);
 				savedata.push(rawimage?.toString("base64"));
@@ -143,7 +207,15 @@ async function SaveMembers(members, selGuild, options, zip) {
 		}
 
 		await members.Execute(`INSERT INTO members (${savekeys.join(", ")}, avatar, banner) VALUES (${Array(savedata.length).fill("?").join(", ")})`, savedata);
-		print(`${++idx}/${gmembers.size} done`);
+
+        let qualitytext = "";
+
+        switch (options.save_members_images) {
+            case "y": qualitytext = " (low-res image)"; break;
+            case "f": qualitytext = " (high-res image)"; break;
+        }
+
+        print(`${++idx}/${gmembers.size} members saved${qualitytext} - ${member?.user?.tag ?? "unnamed"}`)
 	}
 
 	print("Saved members!")
@@ -213,11 +285,17 @@ async function SaveServerInfo(serverinfo, selGuild, allChannels, allCategories, 
 		let rawimage = await GetLinkData(iconurl);
 		svsave["icon"] = rawimage?.toString("base64");
 	}
-	
+
 	let bannerurl = selGuild.bannerURL({ format: "png" })
 	if (bannerurl) {
 		let rawimage = await GetLinkData(bannerurl);
 		svsave["banner"] = rawimage?.toString("base64");
+	}
+
+	let discoveryurl = selGuild.discoverySplashURL({ format: "png" })
+	if (discoveryurl) {
+		let rawimage = await GetLinkData(discoveryurl);
+		svsave["discoverySplash"] = rawimage?.toString("base64");
 	}
 
 	try {
@@ -234,30 +312,43 @@ async function SaveServerInfo(serverinfo, selGuild, allChannels, allCategories, 
 		print("Couldn't save bans list, your account probably doesn't have the permission to see them. (" + e + ")");
 	}
 
+    print("Saving emojis...")
 	let emojis = await selGuild.emojis.fetch()
-	for (let pairs in emojis) {
+    let idx = 0;
+	for (let pairs of emojis) {
 		let emoji = pairs[1];
 		let imagedata = null;
 
-		if (options.save_emoji_images)
-			image = await GetLinkData()
-		
+		if (options.save_emoji_images != "n") {
+            let suffix = options.save_emoji_images == "y" ? "?size=64" : ""
+			imagedata = await GetLinkData(emoji.url + suffix)
+        }
+
 		await serverinfo.Execute("INSERT INTO emojis (id, name, animated, authorId, createdAt, identifier, requiresColons, url, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [
 			emoji?.id, // why are all of these nullable wtf discord
 			emoji?.name,
-			emoji?.animated, 
+			emoji?.animated,
 			emoji?.author?.id,
 			emoji?.createdTimestamp,
 			emoji.identifier, // except this?? what
-			emoji?.requiresColons, 
+			emoji?.requiresColons,
 			emoji?.url,
 			imagedata
 		]);
+
+        let qualitytext = "";
+
+        switch (options.save_emoji_images) {
+            case "y": qualitytext = " (low-res)"; break;
+            case "f": qualitytext = " (high-res)"; break;
+        }
+
+        print(`${++idx}/${emojis.size} emojis saved${qualitytext} - :${emoji?.name ?? "unnamed"}:`)
 	}
 
 	try {
 		let invites = await selGuild.invites.fetch();
-		
+
 		// indexed by code
 		for (let code in invites) {
 			let invite = invites[code];
@@ -319,7 +410,7 @@ async function SaveServerInfo(serverinfo, selGuild, allChannels, allCategories, 
 
 		if (zip) {
 			let svinfo = zip.folder("serverinfo");
-			
+
 			svinfo.file("")
 		}
 	}
@@ -330,8 +421,6 @@ async function SaveServerInfo(serverinfo, selGuild, allChannels, allCategories, 
 	for (let cat of allCategories) {
 		lookupCategories[cat.id] = cat;
 	}
-
-	let selCategories = {}
 	for (let ch of allChannels) {
 		if (ch.parentId && !selCategories[ch.parentId] && lookupCategories[ch.parentId]) {
 			selCategories[ch.parentId] = lookupCategories[ch.parentId];
@@ -342,7 +431,7 @@ async function SaveServerInfo(serverinfo, selGuild, allChannels, allCategories, 
 
 	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS categories (name text, type text, id text, position integer, rawposition integer, created integer)")
 
-	for (let cat of Object.values(selCategories)) {
+	for (let cat of Object.values(allCategories)) {
 		await serverinfo.Execute("INSERT INTO categories (name, type, id, position, rawposition, created) VALUES (?, ?, ?, ?, ?, ?)", [
 			cat.name, cat.type, cat.id, cat.position, cat.rawPosition, cat.createdAt
 		])
