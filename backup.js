@@ -4,6 +4,7 @@ import path from "path"
 import fetch from "node-fetch"
 import Discord from "discord.js-selfbot-v13";
 import JSZip from "jszip";
+import readline from "readline-sync";
 import { message_save_keys } from "./data.js";
 
 let spins = ['/', '-', '\\', '|']
@@ -12,6 +13,10 @@ function print(data, char, inplace) {
     process.stdout.write(`${spins[spin_idx++]} ${data}           \r` + (inplace ? "" : "\n"))
 	spin_idx = spin_idx % spins.length;
 }
+
+function sleep(time) {
+	return new Promise(resolve => setTimeout(resolve, time));
+} 
 
 const Clean4FS = str => str.toLowerCase().replaceAll(/\_/gm, "").replaceAll(/[^a-zA-Z0-9\(\)\s\-]+/gm, "_");
 
@@ -92,29 +97,81 @@ export default async function startBackup(bot, selGuild, selChans, allCategories
 		await SaveMembers(members, selGuild, options, zip);
     }
 
-    await SaveMessages(messages, selGuild, selChans, options, zip);
+    await SaveMessages(messages, messagecounts, selGuild, selChans, options, zip);
 }
 
-async function SaveMessages(messages, selGuild, selChans, options, zip) {
-    print("Saving messages...");
+async function FetchAllMessages(messages, table, channel) {
+	// first create the table in the database
+	let text = "";
 
-	for (let chan in selChans) {
-		let savekeys = [];
-		let savedata = [];
-
-		for (let i = 0; i < message_save_keys.length; i++) {
-			savekeys.push(message_save_keys[i]);
-			savedata.push(chan[message_save_keys[i]]);
-		}
-
-		savekeys.push("activity", JSON.stringify(chan.activity));
-
-		let qmarks = Array(savekeys.length).fill("?").join(", ");
-		await messages.Execute(`CREATE TABLE IF NOT EXISTS ? (${qmarks}) VALUES ${qmarks}`, savedata);
+	for (let i = 0; i < message_save_keys.length; i++) {
+		let val = message_save_keys[i];
+		keyslist.push(val);
 	}
 
-    let prevID;
+	console.log(`CREATE TABLE IF NOT EXISTS ${table} (${text})`, keyslist);
+	await messages.Execute(`CREATE TABLE IF NOT EXISTS ${table} (${text})`, keyslist);
 
+	let prevID = "";
+	let options = { limit: 100 };
+
+	// if a fetch fails this is set to true, if one succeeds it's set to false
+	// if a fetch fails for the first time, it'll print the error and wait for the error to go away or be resolved
+	// it also waits for player input to abort retrying and skip to the next channel if possible
+	let didPreviousFetchFail = false;
+	let skipped = false;
+
+	while (true) {
+		if (skipped) break;
+
+		let msgs = await channel.messages.fetch(options).catch(async err => {
+			if (!didPreviousFetchFail) {
+				didPreviousFetchFail = true;
+				print("");
+				print("[ ERROR ]");
+				print(`Couldn't fetch messages from channel "${channel.name}" (TYPE: ${channel.type})`)
+				print(`Error message: ${err}`);
+				print(`Automatically retrying to fetch messages every 10 seconds. To skip this channel, type "skip".`);
+			} else {
+				await sleep(1000);
+				return "retry";
+			}
+
+			new Promise((resolve, reject) => {
+				let data = readline.question("> ").toString();
+				if (skipped) {
+					resolve();
+					return;
+				}
+				else {
+					if (data != "skip") {
+						print("If you want to cancel the fetch retry, type skip.");
+					} else {
+						skipped = true;
+						print("Skipped.");
+					}
+					resolve();
+				}
+			})
+
+			await sleep(10000);
+			return "retry";
+		})
+
+		if (msgs == "retry") continue;
+
+		console.log(msgs);
+
+		await sleep(1500);
+	}
+}
+
+async function SaveMessages(messages, messagecounts, selGuild, selChans, options, zip) {
+    print("Saving messages...");
+
+	for (let chan of selChans) {
+		await FetchAllMessages(messages, chan.name, chan);
+	}
 }
 
 async function SaveRoles(roles, selGuild, options, zip) {
@@ -166,7 +223,7 @@ async function SaveRoles(roles, selGuild, options, zip) {
 async function SaveMembers(members, selGuild, options, zip) {
 	print("Saving members...")
 
-	await members.Execute("CREATE TABLE IF NOT EXISTS members (id text, username text, discriminator text, tag text, nickname text, createdTimestamp integer, bot integer, system integer, communicationDisabledTimestamp integer, displayHexColor text, joinedTimestamp integer, pending integer, premiumSinceTimestamp integer, avatar text, banner text)")
+	await members.Execute("CREATE TABLE IF NOT EXISTS members (id text, username text, discriminator text, tag text, nickname text, createdTimestamp integer, bot integer, system integer, communicationDisabledTimestamp integer, displayHexColor text, joinedTimestamp integer, pending integer, premiumSinceTimestamp integer, avatar blob, banner blob)")
 
 	let savekeys = [
 		"id",
@@ -205,13 +262,13 @@ async function SaveMembers(members, selGuild, options, zip) {
 			let avatarurl = member?.user.avatarURL(membersFetchOptions)
 			if (avatarurl) {
 				let rawimage = await GetLinkData(avatarurl);
-				savedata.push(rawimage?.toString("base64"));
+				savedata.push(rawimage);
 			} else savedata.push(null);
 
 			let bannerurl = member?.user.bannerURL(membersFetchOptions)
 			if (bannerurl) {
 				let rawimage = await GetLinkData(bannerurl);
-				savedata.push(rawimage?.toString("base64"));
+				savedata.push(rawimage);
 			} else savedata.push(null);
 		} else {
 			savedata.push(null);
@@ -237,7 +294,7 @@ async function SaveServerInfo(serverinfo, selGuild, allChannels, allCategories, 
 	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS serverinfo (type text, data text)")
 	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS bans (id text, user text, reason text)")
 	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS invites (code text, temporary integer, maxAge integer, uses integer, maxUses integer, inviterId integer, createdAt integer, expiresAt integer, url text)")
-	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS emojis (id text, name text, animated integer, authorId text, createdAt integer, identifier text, requiresColons integer, url text, image text)")
+	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS emojis (id text, name text, animated integer, authorId text, createdAt integer, identifier text, requiresColons integer, url text, image blob)")
 	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS channels (name text, type text, id text, parentId text, position integer, rawPosition integer, createdAt integer, nsfw integer, lastMessageId text, topic text, rateLimitPerUser integer, bitrate integer, rtcRegion text, userLimit integer)")
 
 	print("Saving server settings...");
