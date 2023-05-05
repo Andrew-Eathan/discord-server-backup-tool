@@ -5,7 +5,7 @@ import fetch from "node-fetch"
 import Discord from "discord.js-selfbot-v13";
 import JSZip from "jszip";
 import readline from "readline-sync";
-import { message_save_keys } from "./data.js";
+import { messagekeys } from "./data.js";
 
 let spins = ['/', '-', '\\', '|']
 let spin_idx = 0
@@ -16,7 +16,7 @@ function print(data, char, inplace) {
 
 function sleep(time) {
 	return new Promise(resolve => setTimeout(resolve, time));
-} 
+}
 
 const Clean4FS = str => str.toLowerCase().replaceAll(/\_/gm, "").replaceAll(/[^a-zA-Z0-9\(\)\s\-]+/gm, "_");
 
@@ -100,17 +100,10 @@ export default async function startBackup(bot, selGuild, selChans, allCategories
     await SaveMessages(messages, messagecounts, selGuild, selChans, options, zip);
 }
 
-async function FetchAllMessages(messages, table, channel) {
+async function FetchAllMessages(messages, channel) {
 	// first create the table in the database
-	let text = "";
-
-	for (let i = 0; i < message_save_keys.length; i++) {
-		let val = message_save_keys[i];
-		keyslist.push(val);
-	}
-
-	console.log(`CREATE TABLE IF NOT EXISTS ${table} (${text})`, keyslist);
-	await messages.Execute(`CREATE TABLE IF NOT EXISTS ${table} (${text})`, keyslist);
+	console.log(`CREATE TABLE IF NOT EXISTS messages (${messagekeys})`);
+	await messages.Execute(`CREATE TABLE IF NOT EXISTS messages (${messagekeys})`);
 
 	let prevID = "";
 	let options = { limit: 100 };
@@ -160,7 +153,14 @@ async function FetchAllMessages(messages, table, channel) {
 
 		if (msgs == "retry") continue;
 
-		console.log(msgs);
+        // so that the fetch continues from this ID
+        if (msgs.length > 0) {
+            options.before = msgs[0].id
+        }
+
+        for (let pairs in msgs) {
+
+        }
 
 		await sleep(1500);
 	}
@@ -790,6 +790,17 @@ async function SaveServerInfo(serverinfo, selGuild, allChannels, allCategories, 
 		svinfo = svinfo ?? zip.folder("server");
 
 		let key = -1
+            role.id,
+            role.name,
+            role.createdTimestamp,
+            role.hoist,
+            role.mentionable,
+            JSON.stringify(role.tags),
+            role.position,
+            role.rawPosition,
+            role.hexColor,
+            role.unicodeEmoji,
+            icondata
 		for (var channel of selectedChannels) {
 			logs.log(`[Channel #${channel.name} backup start]`)
 			key++;
