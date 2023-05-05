@@ -5,12 +5,12 @@ import fetch from "node-fetch"
 import Discord from "discord.js-selfbot-v13";
 import JSZip from "jszip";
 import readline from "readline-sync";
-import { attachmentsKeys, messageKeys, messageKeysArr } from "./data.js";
+import { attachmentsKeys, attachmentsKeysArr, messageKeys, messageKeysArr } from "./data.js";
 import { inspect } from "util";
 
 let spins = ['/', '-', '\\', '|']
 let spin_idx = 0
-function print(data, char, inplace) {
+function print(data, inplace) {
     process.stdout.write(`${spins[spin_idx++]} ${data}           \r` + (inplace ? "" : "\n"))
 	spin_idx = spin_idx % spins.length;
 }
@@ -114,6 +114,7 @@ async function FetchAllMessages(messages, channel) {
 	// it also waits for player input to abort retrying and skip to the next channel if possible
 	let didPreviousFetchFail = false;
 	let skipped = false;
+	let msgCount = 0;
 
 	while (true) {
 		if (skipped) break;
@@ -159,10 +160,15 @@ async function FetchAllMessages(messages, channel) {
             options.before = msgs[0].id
         }
 
+		msgCount += msgs.length;
+
         for (let pairs of msgs) {
 			let msg = pairs[1];
 			let savekeys = [];
 			let savedata = [];
+
+			savekeys.push("authorId"); savedata.push(msg.author.id);
+			savekeys.push("channelId"); savedata.push(msg.channel.id);
 
 			for (let key of messageKeysArr) {
 				if (typeof msg[key] != "undefined") {
@@ -171,19 +177,31 @@ async function FetchAllMessages(messages, channel) {
 				}
 			}
 
-			savekeys.push("authorId"); savedata.push(msg.author.id);
-			savekeys.push("channelId"); savedata.push(msg.channel.id);
-
 			for (let attpairs of msg.attachments) {
 				let att = attpairs[1];
-				await messages.Execute(`INSERT INTO attachments (${attachmentsKeys.join(", ")}) VALUES (${makePlaceholders(attachmentsKeys.length)})`, [
-					
+
+				await messages.Execute(`INSERT INTO attachments (${attachmentsKeysArr.join(", ")}) VALUES (${makePlaceholders(attachmentsKeysArr.length)})`, [
+					att.id,
+					att.contentType,
+					att.description,
+					att.duration,
+					att.ephemeral,
+					att.width,
+					att.height,
+					att.name,
+					att.size,
+					att.spoiler
 				])
 			}
 			
-			await messages.Execute(`INSERT INTO messages (${savekeys.join(", ")}) VALUES (${})`, savedata);
+			savekeys.push("attachmentCount"); savedata.push(msg.attachments.length);
+
+			await messages.Execute(`INSERT INTO messages (${savekeys.join(", ")}) VALUES (${makePlaceholders(savekeys.length)})`, savedata);
         }
 
+		print(`Channel "${channel.name}": ${msgCount} messages fetched`, true);
+
+		break;
 		await sleep(1500);
 	}
 }
