@@ -5,13 +5,18 @@ import fetch from "node-fetch"
 import Discord from "discord.js-selfbot-v13";
 import JSZip from "jszip";
 import readline from "readline-sync";
-import { messagekeys } from "./data.js";
+import { attachmentsKeys, messageKeys, messageKeysArr } from "./data.js";
+import { inspect } from "util";
 
 let spins = ['/', '-', '\\', '|']
 let spin_idx = 0
 function print(data, char, inplace) {
     process.stdout.write(`${spins[spin_idx++]} ${data}           \r` + (inplace ? "" : "\n"))
 	spin_idx = spin_idx % spins.length;
+}
+
+function makePlaceholders(amount) {
+	return Array(amount).fill("?").join(", ");
 }
 
 function sleep(time) {
@@ -101,10 +106,6 @@ export default async function startBackup(bot, selGuild, selChans, allCategories
 }
 
 async function FetchAllMessages(messages, channel) {
-	// first create the table in the database
-	console.log(`CREATE TABLE IF NOT EXISTS messages (${messagekeys})`);
-	await messages.Execute(`CREATE TABLE IF NOT EXISTS messages (${messagekeys})`);
-
 	let prevID = "";
 	let options = { limit: 100 };
 
@@ -158,8 +159,29 @@ async function FetchAllMessages(messages, channel) {
             options.before = msgs[0].id
         }
 
-        for (let pairs in msgs) {
+        for (let pairs of msgs) {
+			let msg = pairs[1];
+			let savekeys = [];
+			let savedata = [];
 
+			for (let key of messageKeysArr) {
+				if (typeof msg[key] != "undefined") {
+					savekeys.push(key);
+					savedata.push(msg[key]);
+				}
+			}
+
+			savekeys.push("authorId"); savedata.push(msg.author.id);
+			savekeys.push("channelId"); savedata.push(msg.channel.id);
+
+			for (let attpairs of msg.attachments) {
+				let att = attpairs[1];
+				await messages.Execute(`INSERT INTO attachments (${attachmentsKeys.join(", ")}) VALUES (${makePlaceholders(attachmentsKeys.length)})`, [
+					
+				])
+			}
+			
+			await messages.Execute(`INSERT INTO messages (${savekeys.join(", ")}) VALUES (${})`, savedata);
         }
 
 		await sleep(1500);
@@ -169,8 +191,11 @@ async function FetchAllMessages(messages, channel) {
 async function SaveMessages(messages, messagecounts, selGuild, selChans, options, zip) {
     print("Saving messages...");
 
+	await messages.Execute(`CREATE TABLE IF NOT EXISTS messages (${messageKeys})`);
+	await messages.Execute(`CREATE TABLE IF NOT EXISTS attachments (${attachmentsKeys})`);
+
 	for (let chan of selChans) {
-		await FetchAllMessages(messages, chan.name, chan);
+		await FetchAllMessages(messages, chan);
 	}
 }
 
@@ -275,7 +300,7 @@ async function SaveMembers(members, selGuild, options, zip) {
 			savedata.push(null);
 		}
 
-		await members.Execute(`INSERT INTO members (${savekeys.join(", ")}, avatar, banner) VALUES (${Array(savedata.length).fill("?").join(", ")})`, savedata);
+		await members.Execute(`INSERT INTO members (${savekeys.join(", ")}, avatar, banner) VALUES (${makePlaceholders(savedata.length)})`, savedata);
 
         let qualitytext = "";
 
@@ -475,7 +500,7 @@ async function SaveServerInfo(serverinfo, selGuild, allChannels, allCategories, 
 			} break;
 		}
 
-		await serverinfo.Execute(`INSERT INTO channels (${savekeys.join(", ")}) VALUES (${Array(savedata.length).fill("?").join(", ")})`, savedata)
+		await serverinfo.Execute(`INSERT INTO channels (${savekeys.join(", ")}) VALUES (${makePlaceholders(savedata.length)})`, savedata)
 
 		if (zip) {
 			let svinfo = zip.folder("serverinfo");
