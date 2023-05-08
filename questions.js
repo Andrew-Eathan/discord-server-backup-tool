@@ -88,21 +88,28 @@ export default async bot => {
 				console.log(`category ${i + 1}: ${cat.name} (${chans?.length ?? 0} channel(s))`)
 
 				for (let j = 0; j < chans.length; j++) {
-					console.log(`- ${i + 1}-${j + 1}: #${chans[j].name} ${chans[j].type == "GUILD_VOICE" ? "(VOICE CHANNEL)" : ""}`)
+					let accesstext = !chans[j].viewable ? "(HIDDEN, NOT ALLOWED)" : ""
+					console.log(`- ${i + 1}-${j + 1}: #${chans[j].name} ${chans[j].type == "GUILD_VOICE" ? "(VOICE CHANNEL)" : ""} ${accesstext}`)
 				}
 			}
 
 			if (logChan != null) {
-				console.log(`Added channel #${logChan.name} to list`)
+				console.log(`${logChan[0] ? "Removed" : "Added"} channel #${logChan[1].name} ${logChan[0] ? "from" : "to"} list`)
 				logChan = null
 			}
 
 			console.log()
-			let key = cmdGetString(val => {
+			let key = cmdGetString(pval => {
+				let val = pval[0] == "!" ? pval.slice(1) : pval;
 				let args = val.split(/\s+/g)
-				let case1 = args.length == 1 && isValid(getch(val))
+				let channel = getch(val);
+				let viewable = channel ? channel[0]?.viewable : true;
+				let case1 = args.length == 1 && isValid(channel) && viewable;
 				let case2 = args.length == 2 && (Number(args[1]) == Number(args[1])) && args[0] == "all"
 				let case3 = args.length == 1 && args[0] == "all"
+
+				if (!viewable)
+					console.log("Channel not accessible by the user, please pick another.")
 
 				return case1
 					|| case2
@@ -110,8 +117,10 @@ export default async bot => {
 					|| args[0] == "done";
 			})
 
-			let check = key.split(/\s+/g)
+			let remove = key[0] == "!"
+			if (remove) key = key.slice(1);
 
+			let check = key.split(/\s+/g)
 			if (check[0] == "all") {
 				if (check.length > 1) {
 					let idx = Number(check[1])
@@ -123,14 +132,22 @@ export default async bot => {
 					}
 
 					let chans = fancyChList[cat.id]
-					chans.splice(0, chans.length).forEach(chan => selChans.push(chan))
+					chans.splice(0, chans.length).forEach(chan => {
+						if (chan.viewable)
+							selChans.push(chan)
+						else chans.push(chan)
+					})
 				}
 				else
 				{
 					// add all channels in all categories
 					for (let keyx in fancyChList) {
 						let chans = fancyChList[keyx]
-						chans.splice(0, chans.length).forEach(chan => selChans.push(chan))
+						chans.splice(0, chans.length).forEach(chan => {
+							if (chan.viewable)
+								selChans.push(chan)
+							else chans.push(chan)
+						})
 					}
 
 					console.log("Selected all channels!")
@@ -139,9 +156,12 @@ export default async bot => {
 			else if (key.split("-").length > 1)
 			{
 				let chan = getch(key)
-				selChans.push(chan[0])
 				fancyChList[chan[1]].splice(chan[2], 1)
-				logChan = chan[0]
+				logChan = [ remove, chan[0] ]
+
+				if (!remove) {
+					selChans.push(chan[0])
+				}
 			}
 
 			doneChSel = key == "done" || fancyChList.length == 0;
@@ -159,6 +179,8 @@ export default async bot => {
 
             while (true) {
                 let answer = cmdGetString(val => {
+					// allow screwed up numbers, the number handler will check if it's a messed up number
+					if (option.type == "number") return true;
                     if (!option.not_precise && !option.accepted.includes(val)) return false;
                     return true;
                 })
