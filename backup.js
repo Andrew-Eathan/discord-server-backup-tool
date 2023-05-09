@@ -40,6 +40,23 @@ async function OpenDatabase(folder, name) {
     return await SQL.OpenFile(path.resolve(folder, name + ".db"))
 }
 
+// helper functions for backup info database
+async function GetBackupInfo(db, key) {
+	return await db.Execute("SELECT * FROM backupinfo WHERE key = ?", key);
+}
+async function SetBackupInfo(db, key, value) {
+	return await db.Execute("INSERT INTO backupinfo (key, value) VALUES (?, ?)", key, value);
+}
+async function IsChannelSaved(db, id) {
+	let data = await db.Execute("SELECT * FROM finishedchannels WHERE id = ?", id);
+	console.log("chansave", id, data)
+	return data != null;
+}
+async function MarkChannelAsSaved(db, id) {
+	await db.Execute("INSERT INTO finishedchannels (id) VALUES (?)", id);
+	console.log("chanmarksave", id, data)
+}
+
 export default async function startBackup(bot, selGuild, selChans, allCategories, allChannels, options) {
 	// explanation:
 	// we start with no previous chunk so we fetch the first ~100 messages (api limit)
@@ -70,6 +87,31 @@ export default async function startBackup(bot, selGuild, selChans, allCategories
 		fs.mkdirSync(folder)
 	} else fs.mkdirSync(folder);
 
+	// populate backup info
+	let auxdb = await OpenDatabase(folder, "backupinfo");
+	await auxdb.Execute("CREATE TABLE IF NOT EXISTS backupinfo (key text, value text)");
+	await auxdb.Execute("CREATE TABLE IF NOT EXISTS finishedchannels (id text)");
+	await auxdb.Execute("CREATE TABLE IF NOT EXISTS channels (id text)");
+	await auxdb.Execute("CREATE TABLE IF NOT EXISTS options (key text, value text)");
+
+	let alreadyPopulated = await GetBackupInfo(auxdb, "alreadyPopulated");
+	if (alreadyPopulated == null) {
+		for (let chan of selChans) {
+			console.log("INSERT INTO channels (id) VALUES (?)", chan.id)
+			await auxdb.Execute("INSERT INTO channels (id) VALUES (?)", chan.id)
+		}
+
+		for (let key in options) {
+			console.log("INSERT INTO options (key, value) VALUES (?, ?)", key, options[key].toString())
+			await auxdb.Execute("INSERT INTO options (key, value) VALUES (?, ?)", key, options[key].toString())
+		}
+
+		await SetBackupInfo(auxdb, "serverId", selGuild.id)
+		await SetBackupInfo(auxdb, "alreadyPopulated", "yes")
+		print("Populated backup info.")
+	} else print("Backup info already populated, using a loaded backup.")
+
+	// the rest
     let messages = await OpenDatabase(folder, "messages");
 
     let serverinfo = false;
@@ -82,13 +124,12 @@ export default async function startBackup(bot, selGuild, selChans, allCategories
     }
 
     if (serverinfo) {
-        print("Saving server information...")
-        await SaveServerInfo(serverinfo, selGuild, allChannels, allCategories, options);
-		await SaveRoles(roles, selGuild, options);
-		await SaveMembers(members, selGuild, options);
+        await SaveServerInfo(auxdb, serverinfo, selGuild, allChannels, allCategories, options);
+		await SaveRoles(auxdb, roles, selGuild, options);
+		await SaveMembers(auxdb, members, selGuild, options);
     }
 
-    await SaveMessages(messages, selChans, options);
+    await SaveMessages(auxdb, messages, selChans, options);
 
 	print("Backup complete!\nWaiting 3 seconds for all remaining async SQL queries to finish and then quitting. Your backup is available in the folder \"" + folder + "\"!")
 
@@ -260,7 +301,12 @@ async function FetchAllMessages(messages, channel, saveOptions, messagesSaved) {
 	return msgCount;
 }
 
-async function SaveMessages(messages, selChans, options) {
+async function SaveMessages(auxdb, messages, selChans, options) {
+	if ((await GetBackupInfo(auxdb, "savedMessages")) == "yes") {
+		print("Skipping message backup, since the loaded backup already did it.");
+		return;
+	}
+
     print("Saving messages...");
 
 	await messages.Execute(`CREATE TABLE IF NOT EXISTS messages (${messageKeys})`);
@@ -278,22 +324,48 @@ async function SaveMessages(messages, selChans, options) {
 
 		if (activeThreads)
 			for (let pairs of activeThreads.threads) {
+				if (await IsChannelSaved(auxdb, pairs[1].id)) {
+					print(`Skipping active thread "${pairs[1].name}" from channel #${chan.name} because the loaded backup already has it.`);
+					continue;
+				}
+
 				print(`Saving active thread "${pairs[1].name}" from channel #${chan.name}`);
 				messagesSaved += await FetchAllMessages(messages, pairs[1], options, messagesSaved);
+				MarkChannelAsSaved(auxdb, pairs[1].id);
 			}
 
 		if (archivedThreads)
 			for (let pairs of archivedThreads.threads) {
+				if (await IsChannelSaved(auxdb, pairs[1].id)) {
+					print(`Skipping archived thread "${pairs[1].name}" from channel #${chan.name} because the loaded backup already has it.`);
+					continue;
+				}
+
 				print(`Saving archived thread "${pairs[1].name}" from channel #${chan.name}`);
 				messagesSaved += await FetchAllMessages(messages, pairs[1], options, messagesSaved);
+				MarkChannelAsSaved(auxdb, pairs[1].id);
 			}
+
+		if (await IsChannelSaved(auxdb, chan.id)) {
+			print(`Skipping channel #${chan.name} because the loaded backup already has it.`);
+			await SetBackupInfo(auxdb, "savedMessages", "yes");
+			return;
+		}
 
 		print(`Saving messages from channel #${chan.name}`);
 		messagesSaved += await FetchAllMessages(messages, chan, options, messagesSaved);
+		MarkChannelAsSaved(auxdb, chan.id);
 	}
+
+	await SetBackupInfo(auxdb, "savedMessages", "yes");
 }
 
-async function SaveRoles(roles, selGuild, options) {
+async function SaveRoles(auxdb, roles, selGuild, options) {
+	if ((await GetBackupInfo(auxdb, "savedRoles")) == "yes") {
+		print("Skipping role backup, since the loaded backup already did it.");
+		return;
+	}
+
 	print("Saving roles...");
 
 	// dont forget to create a new table with members list for each role
@@ -337,9 +409,15 @@ async function SaveRoles(roles, selGuild, options) {
     }
 
     print("Saved roles!")
+	await SetBackupInfo(auxdb, "savedRoles", "yes");
 }
 
-async function SaveMembers(members, selGuild, options) {
+async function SaveMembers(auxdb, members, selGuild, options) {
+	if ((await GetBackupInfo(auxdb, "savedMembers")) == "yes") {
+		print("Skipping member backup, since the loaded backup already did it.");
+		return;
+	}
+
 	print("Saving members...")
 
 	await members.Execute("CREATE TABLE IF NOT EXISTS members (id text, username text, discriminator text, tag text, nickname text, createdTimestamp integer, bot integer, system integer, communicationDisabledTimestamp integer, displayHexColor text, joinedTimestamp integer, pending integer, premiumSinceTimestamp integer, avatar blob, banner blob)")
@@ -407,9 +485,16 @@ async function SaveMembers(members, selGuild, options) {
 	}
 
 	print("Saved members!")
+	await SetBackupInfo(auxdb, "savedMembers", "yes");
 }
 
-async function SaveServerInfo(serverinfo, selGuild, allChannels, allCategories, options) {
+async function SaveServerInfo(auxdb, serverinfo, selGuild, allChannels, allCategories, options) {
+	if ((await GetBackupInfo(auxdb, "savedServerInfo")) == "yes") {
+		print("Skipping server backup, since the loaded backup already did it.");
+		return;
+	}
+
+	print("Saving server information...")
 	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS serverinfo (type text, data text)")
 	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS bans (id text, user text, reason text)")
 	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS invites (code text, temporary integer, maxAge integer, uses integer, maxUses integer, inviterId integer, createdAt integer, expiresAt integer, url text)")
@@ -620,4 +705,5 @@ async function SaveServerInfo(serverinfo, selGuild, allChannels, allCategories, 
 	}
 
 	print("Saved all server-related info!");
+	await SetBackupInfo(auxdb, "savedServerInfo", "yes");
 }

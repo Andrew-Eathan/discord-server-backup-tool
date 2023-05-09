@@ -1,6 +1,7 @@
 import readline from "readline-sync"
 import { cmdGetNumber, cmdGetString } from "./util.js"
-import { chosen_options, localedata } from "./data.js"
+import { chosen_options } from "./data.js"
+import fs from "fs";
 import startBackup from "./backup.js"
 
 function isValid(val) {
@@ -16,7 +17,29 @@ export default async bot => {
 
 		let dguilds = await bot.guilds.fetch();
 		let list = []
-		let selguilds = []
+
+		console.log("Do you have an unfinished backup? If yes, you can resume it by typing yes.\nTo begin a new server backup process, type no.\n(yes/no)");
+		
+		let unfinished = cmdGetString(val => val == "yes" || val == "no");
+		if (unfinished) {
+			console.log("Type the path to the folder containing the unfinished SQL backup files, relative to the folder of this script.");
+			console.log("If the folder is in the same folder as your script, simply type the folder's name.")
+
+			let folder = cmdGetString(val => {
+				if (!fs.existsSync(val)) {
+					console.log("No folder found at that path!")
+					return false;
+				}
+				else {
+					if (!fs.statSync(val).isDirectory()) {
+						console.log("That's a file, i need a folder.")
+						return false;
+					}
+
+					return true;
+				}
+			})
+		}
 
 		console.log("Select a guild from your list! Type the number to the left of its name.")
 
