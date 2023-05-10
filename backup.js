@@ -35,17 +35,20 @@ async function GetLinkData(link) {
 	return buffer
 }
 
-async function OpenDatabase(folder, name) {
+export async function OpenDatabase(folder, name) {
     print("Opening " + name + " database...")
     return await SQL.OpenFile(path.resolve(folder, name + ".db"))
 }
 
 // helper functions for backup info database
-async function GetBackupInfo(db, key) {
-	return await db.Execute("SELECT * FROM backupinfo WHERE key = ?", key);
+export async function GetBackupInfo(db, key) {
+	let data = await db.Execute("SELECT * FROM backupinfo WHERE key = ?", key);
+    if (data == null) return null;
+    else return data.value;
 }
-async function SetBackupInfo(db, key, value) {
-	return await db.Execute("INSERT INTO backupinfo (key, value) VALUES (?, ?)", key, value);
+export async function SetBackupInfo(db, key, value) {
+    console.log("INSERT INTO backupinfo (key, value) VALUES (?, ?)", [key, value])
+	return await db.Execute("INSERT INTO backupinfo (key, value) VALUES (?, ?)", [key, value]);
 }
 async function IsChannelSaved(db, id) {
 	let data = await db.Execute("SELECT * FROM finishedchannels WHERE id = ?", id);
@@ -54,10 +57,10 @@ async function IsChannelSaved(db, id) {
 }
 async function MarkChannelAsSaved(db, id) {
 	await db.Execute("INSERT INTO finishedchannels (id) VALUES (?)", id);
-	console.log("chanmarksave", id, data)
+	console.log("chanmarksave", id)
 }
 
-export default async function startBackup(bot, selGuild, selChans, allCategories, allChannels, options) {
+export default async function startBackup(bot, selGuild, selChans, allCategories, allChannels, options, saveFolder) {
 	// explanation:
 	// we start with no previous chunk so we fetch the first ~100 messages (api limit)
 	// then we find the ID of the earliest message in this chunk and assign it to prevChunk so we know where to continue next
@@ -73,26 +76,26 @@ export default async function startBackup(bot, selGuild, selChans, allCategories
     if (options.save_role_images == "y")
         roleFetchOptions.size = 128;
 
-    let folder = Clean4FS(selGuild.name)
+    let folder = saveFolder ?? Clean4FS(selGuild.name)
 
-    if (fs.existsSync(folder))
-	{
-		let add = 1;
+    if (!saveFolder)
+        if (fs.existsSync(folder))
+        {
+            let add = 1;
 
-		while (fs.existsSync(folder + "_" + add)) {
-			add++;
-		}
+            while (fs.existsSync(folder + "_" + add)) {
+                add++;
+            }
 
-		folder = folder + "_" + add;
-		fs.mkdirSync(folder)
-	} else fs.mkdirSync(folder);
+            folder = folder + "_" + add;
+            fs.mkdirSync(folder)
+        } else fs.mkdirSync(folder);
 
 	// populate backup info
 	let auxdb = await OpenDatabase(folder, "backupinfo");
 	await auxdb.Execute("CREATE TABLE IF NOT EXISTS backupinfo (key text, value text)");
 	await auxdb.Execute("CREATE TABLE IF NOT EXISTS finishedchannels (id text)");
 	await auxdb.Execute("CREATE TABLE IF NOT EXISTS channels (id text)");
-	await auxdb.Execute("CREATE TABLE IF NOT EXISTS options (key text, value text)");
 
 	let alreadyPopulated = await GetBackupInfo(auxdb, "alreadyPopulated");
 	if (alreadyPopulated == null) {
@@ -101,11 +104,7 @@ export default async function startBackup(bot, selGuild, selChans, allCategories
 			await auxdb.Execute("INSERT INTO channels (id) VALUES (?)", chan.id)
 		}
 
-		for (let key in options) {
-			console.log("INSERT INTO options (key, value) VALUES (?, ?)", key, options[key].toString())
-			await auxdb.Execute("INSERT INTO options (key, value) VALUES (?, ?)", key, options[key].toString())
-		}
-
+		await SetBackupInfo(auxdb, "options", JSON.stringify(options))
 		await SetBackupInfo(auxdb, "serverId", selGuild.id)
 		await SetBackupInfo(auxdb, "alreadyPopulated", "yes")
 		print("Populated backup info.")
@@ -193,7 +192,7 @@ async function FetchAllMessages(messages, channel, saveOptions, messagesSaved) {
         if (msgs.size > 0) {
 			let earliestMessage;
 			let earliestDate = Infinity;
-			
+
 			for (let pairs of msgs) {
 				let msg = pairs[1];
 
@@ -243,7 +242,7 @@ async function FetchAllMessages(messages, channel, saveOptions, messagesSaved) {
 					att.spoiler
 				])
 			}
-			
+
 			savekeys.push("attachmentCount"); savedata.push(msg.attachments.size);
 			savekeys.push("embedCount"); savedata.push(msg.embeds.length);
 			savekeys.push("activity"); savedata.push(msg.activity != null ? JSON.stringify(msg.activity) : null);
@@ -282,7 +281,7 @@ async function FetchAllMessages(messages, channel, saveOptions, messagesSaved) {
 			let percentage = ((messagesSaved + msgCount) / saveOptions.total_message_count * 100).toFixed(2)
 			totalText += `/${saveOptions.total_message_count} (${percentage}%)`
 		}
-		
+
 		totalText += " total in server"
 
 		if (msgs.size < fetchAmount) {
@@ -293,7 +292,7 @@ async function FetchAllMessages(messages, channel, saveOptions, messagesSaved) {
 		print(`Channel "${channel.name}": ${msgCount} messages fetched${totalText}`, false);
 
 		let timeSinceStart = Date.now() - fetchStart;
-		if (timeSinceStart > options.save_interval * 1000) 
+		if (timeSinceStart > options.save_interval * 1000)
 			continue;
 		else await sleep(options.save_interval * 1000 - timeSinceStart);
 	}
@@ -348,8 +347,7 @@ async function SaveMessages(auxdb, messages, selChans, options) {
 
 		if (await IsChannelSaved(auxdb, chan.id)) {
 			print(`Skipping channel #${chan.name} because the loaded backup already has it.`);
-			await SetBackupInfo(auxdb, "savedMessages", "yes");
-			return;
+			continue;
 		}
 
 		print(`Saving messages from channel #${chan.name}`);
@@ -357,7 +355,7 @@ async function SaveMessages(auxdb, messages, selChans, options) {
 		MarkChannelAsSaved(auxdb, chan.id);
 	}
 
-	await SetBackupInfo(auxdb, "savedMessages", "yes");
+	//await SetBackupInfo(auxdb, "savedMessages", "yes");
 }
 
 async function SaveRoles(auxdb, roles, selGuild, options) {

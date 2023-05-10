@@ -3,6 +3,8 @@ import { cmdGetNumber, cmdGetString } from "./util.js"
 import { chosen_options } from "./data.js"
 import fs from "fs";
 import startBackup from "./backup.js"
+import { OpenDatabase, GetBackupInfo } from "./backup.js"
+import { inspect } from "util"
 
 function isValid(val) {
 	return val != null && typeof val != "undefined"
@@ -15,13 +17,13 @@ export default async bot => {
 	bot.on("ready", async _ => {
 		console.log("Loaded in as " + bot.user.tag + "!")
 
-		let dguilds = await bot.guilds.fetch();
 		let list = []
+        let backup_options = JSON.parse(JSON.stringify(chosen_options))
 
 		console.log("Do you have an unfinished backup? If yes, you can resume it by typing yes.\nTo begin a new server backup process, type no.\n(yes/no)");
-		
+
 		let unfinished = cmdGetString(val => val == "yes" || val == "no");
-		if (unfinished) {
+		if (unfinished == "yes") {
 			console.log("Type the path to the folder containing the unfinished SQL backup files, relative to the folder of this script.");
 			console.log("If the folder is in the same folder as your script, simply type the folder's name.")
 
@@ -39,7 +41,50 @@ export default async bot => {
 					return true;
 				}
 			})
+
+            // restore everything
+            let auxdb = await OpenDatabase(folder, "backupinfo")
+            backup_options = JSON.parse(await GetBackupInfo(auxdb, "options"));
+            console.log("Restored options:", backup_options)
+
+            let id = await GetBackupInfo(auxdb, "serverId");
+            let guild = await bot.guilds.fetch(id);
+            if (guild == null) {
+                console.log("Failed to load backup, your account can't access the server from the backup (usually means you aren't in the server) server id: " + id)
+                process.exit()
+            }
+
+            console.log("Loaded guild from backup: " + guild.name)
+
+            let selChans = []
+            let chansDatabase = await auxdb.ExecuteAll("SELECT * FROM channels");
+            console.log("chchhv", chansDatabase)
+            let fetchedChannels = await guild.channels.fetch();
+            for (let ch of chansDatabase) {
+                let chan = fetchedChannels.get(ch.id);
+                if (chan == null) {
+                    console.log("A channel from the backup wasn't found on the server. (it was probably either deleted after the backup, or something else failed) channel id: " + ch.id);
+                    console.log("Skipping this channel.")
+                    continue;
+                }
+
+                console.log("Found channel from backup: " + chan.name + " - type: " + chan.type)
+                selChans.push(chan)
+            }
+
+            let fancyCatList = []
+            fetchedChannels.forEach(channel => {
+                if (channel.type == "GUILD_CATEGORY") {
+                    fancyCatList.push(channel);
+                }
+            })
+
+            console.log("Starting backup...")
+            setTimeout(_ => startBackup(bot, guild, selChans, fancyCatList, fetchedChannels, backup_options, folder), 1000)
+            return;
 		}
+
+		let dguilds = await bot.guilds.fetch();
 
 		console.log("Select a guild from your list! Type the number to the left of its name.")
 
@@ -195,8 +240,8 @@ export default async bot => {
         console.log("Now, specify some options for the backup process.")
         console.log("Type y/n, or an option depending on the question:")
 
-        Object.keys(chosen_options).forEach(key => {
-            let option = chosen_options[key]
+        Object.keys(backup_options).forEach(key => {
+            let option = backup_options[key]
             console.log()
             console.log(option.text);
 
@@ -209,7 +254,7 @@ export default async bot => {
                 })
 
                 if (answer == "") {
-                    chosen_options[key] = option.default;
+                    backup_options[key] = option.default;
                     break;
                 }
 
@@ -217,7 +262,7 @@ export default async bot => {
                 {
                     switch (option.type) {
                         case "bool":
-                            chosen_options[key] = answer == "y" ? true : false
+                            backup_options[key] = answer == "y" ? true : false
                         break;
                         case "number":
                             let num = Number(answer)
@@ -230,10 +275,10 @@ export default async bot => {
                                 break process_answer;
                             }
 
-                            chosen_options[key] = num
+                            backup_options[key] = num
                         break;
                         default:
-                            chosen_options[key] = answer
+                            backup_options[key] = answer
                         break;
                     }
                     break;
@@ -242,11 +287,11 @@ export default async bot => {
         })
 
         console.log("Your options:")
-        console.log(chosen_options)
+        console.log(backup_options)
 
         console.log()
         console.log("Backup will begin in 3 seconds...")
 
-        setTimeout(_ => startBackup(bot, selGuild, selChans, fancyCatList, allChannels, chosen_options), 3000)
+        setTimeout(_ => startBackup(bot, selGuild, selChans, fancyCatList, allChannels, backup_options), 3000)
 	})
 }
