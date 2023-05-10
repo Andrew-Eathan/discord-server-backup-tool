@@ -14,11 +14,13 @@ import chalk from "chalk";
 import sqlite3 from "sqlite3";
 
 let SQL = {}
+export let OpenDatabases = [];
 
 SQL.OpenFile = filename => {
     return new Promise((resolveTop, rejectTop) => {
         let obj = {
-            IsValid: false
+            IsValid: false,
+            FileName: filename
         }
 
         obj.Client = new sqlite3.Database(filename, async err => {
@@ -29,8 +31,12 @@ SQL.OpenFile = filename => {
             }
 
             obj.IsValid = true
+            OpenDatabases.push(obj);
 
             obj.Execute = async (query, params) => {
+                if (!obj.IsValid)
+                    return console.log("Tried to execute SQL query on an invalid database.\nIgnore this if you're seeing this after forcefully closing the tool!")
+
                 let promise = new Promise((resolve, reject) => {
                     let fn = (err, row) => {
                         if (err) {
@@ -48,6 +54,9 @@ SQL.OpenFile = filename => {
             }
 
             obj.ExecuteAll = async (query, params) => {
+                if (!obj.IsValid)
+                    return console.log("Tried to execute SQL query on an invalid database.\nIgnore this if you're seeing this after forcefully closing the tool!")
+
                 let promise = new Promise((resolve, reject) => {
                     let fn = (err, row) => {
                         if (err) {
@@ -62,6 +71,20 @@ SQL.OpenFile = filename => {
                 })
 
                 return promise;
+            }
+
+            obj.Close = async _ => {
+                if (!obj.IsValid)
+                    return console.log("Tried to close an invalid database.\nIgnore this if you're seeing this after forcefully closing the tool!")
+
+                return new Promise((resolve, reject) => {
+                    obj.Client.close(err => {
+                        if (err) reject(err);
+                        OpenDatabases.splice(OpenDatabases.indexOf(obj), 1);
+                        obj.IsValid = false;
+                        resolve();
+                    });
+                })
             }
 
             resolveTop(obj)

@@ -108,7 +108,7 @@ export default async function startBackup(bot, selGuild, selChans, allCategories
 		await SetBackupInfo(auxdb, "serverId", selGuild.id)
 		await SetBackupInfo(auxdb, "alreadyPopulated", "yes")
 		print("Populated backup info.")
-	} else print("Backup info already populated, using a loaded backup.")
+	} else print("Using a loaded backup.")
 
 	// the rest
     let messages = await OpenDatabase(folder, "messages");
@@ -140,6 +140,13 @@ async function FetchAllMessages(messages, channel, saveOptions, messagesSaved) {
 	let prevID = "";
 	let fetchAmount = 100
 	let options = { limit: fetchAmount };
+	
+	// check if there are any messages in this channel to continue from
+	let oldestMessage = await messages.Execute("SELECT MIN(id) FROM messages WHERE channelId = ?", [channel.id]);
+	if (oldestMessage != null) {
+		console.log(oldestMessage);
+		//print(`Resuming backup in this channel from where it stopped! (oldest message id: ${oldestMessage}`)
+	}
 
 	// if a fetch fails this is set to true, if one succeeds it's set to false
 	// if a fetch fails for the first time, it'll print the error and wait for the error to go away or be resolved
@@ -313,6 +320,12 @@ async function SaveMessages(auxdb, messages, selChans, options) {
 	await messages.Execute(`CREATE TABLE IF NOT EXISTS embeds (${embedKeys})`);
 
 	let messagesSaved = 0;
+
+	let msgCount = await messages.Execute("SELECT COUNT(*) FROM messages");
+	if (msgCount != null && msgCount["COUNT(*)"] > 0) {
+		console.log("msgcount", msgCount);
+		messagesSaved = msgCount["COUNT(*)"];
+	}
 
 	for (let chan of selChans) {
 		let activeThreads = await chan.threads?.fetchActive();

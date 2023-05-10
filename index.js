@@ -5,7 +5,7 @@ console.log("|           R  E  W  R  I  T  E           |")
 console.log("-------------------------------------------")
 console.log()
 
-import SQL from "./sql.js"
+import { OpenDatabases } from "./sql.js"
 import Discord from "discord.js-selfbot-v13"
 import readline from "readline-sync"
 await import ("dotenv/config")
@@ -32,3 +32,16 @@ questions(bot)
 
 bot.login(token);
 console.log("Logging in...")
+
+process.on('SIGINT', async function() {
+	let original = OpenDatabases.length
+	console.log("Caught interrupt signal, closing " + original + " open databases...")
+
+	for (let i = original - 1; i >= 0; i--) {
+		await OpenDatabases[i].Close();
+		console.log(`${original - i} / ${original}`);
+	}
+
+	console.log("Done. If you want to resume your backup (if it hasn't finished yet), you can do so later!")
+	process.exit();
+});
