@@ -237,6 +237,7 @@ async function FetchAllMessages(messages, channel, saveOptions, messagesSaved) {
 				let att = attpairs[1];
 
 				messages.Execute(`INSERT INTO attachments (${attachmentsKeysArr.join(", ")}) VALUES (${makePlaceholders(attachmentsKeysArr.length)})`, [
+					msg.id,
 					att.id,
 					att.contentType,
 					att.description,
@@ -259,7 +260,7 @@ async function FetchAllMessages(messages, channel, saveOptions, messagesSaved) {
 			}
 
 			// this code is kinda ugly but uh
-			if (options.save_embeds)
+			if (saveOptions.save_embeds)
 				for (let embed of msg.embeds) {
 					messages.Execute(`INSERT INTO embeds VALUES (${makePlaceholders(embedKeys.split(",").length)})`, [
 						msg.id,

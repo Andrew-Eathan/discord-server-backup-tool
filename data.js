@@ -13,6 +13,7 @@ export const messageKeysArr = [
 
 export const attachmentsKeysArr = [
 	"messageId",
+	"attachmentId",
 	"contentType",
 	"description",
 	"duration",
@@ -28,7 +29,7 @@ export const messageKeys
 	  = "id text, authorId text, channelId text, applicationId text, type text, content text, createdTimestamp integer, editedTimestamp integer, " + 
 		"hasThread integer, threadId text, embedCount integer, pinned integer, system integer, tts integer, activity text, attachmentCount integer, referenceChannelId text, referenceGuildId text, referenceMessageId text"
 
-export const attachmentKeys = "messageId text, contentType text, description text, duration real, ephemeral integer, width integer, height integer, id text, name text, size integer, spoiler integer"
+export const attachmentKeys = "messageId text, attachmentId, contentType text, description text, duration real, ephemeral integer, width integer, height integer, id text, name text, size integer, spoiler integer"
 
 export const embedKeys = "id text, author text, color integer, description text, fields text, footer text, hexColor text, image text, length integer, provider text, thumbnail text, timestamp text, title text, url text, video text"
 
