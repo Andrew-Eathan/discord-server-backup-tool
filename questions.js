@@ -118,6 +118,8 @@ export default async bot => {
 		// category 2
 		// - channel 1
 
+		fancyCatList.push({ name: "noparent", id: "noparent" })
+
 		selGuild.channels.cache.forEach(ch => {
 			switch (ch.type) {
 				case "GUILD_TEXT":
@@ -234,6 +236,8 @@ export default async bot => {
 
 			doneChSel = key == "done" || fancyChList.length == 0;
 		}
+
+		fancyCatList.shift();
 
 		console.log(selChans.length + " channels selected!")
         console.log()
