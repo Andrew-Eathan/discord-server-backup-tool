@@ -6,6 +6,7 @@ console.log("-------------------------------------------")
 console.log()
 
 import { OpenDatabases } from "./sql.js"
+import { BackupActive } from "./backup.js"
 import Discord from "discord.js-selfbot-v13"
 import readline from "readline-sync"
 await import ("dotenv/config")
@@ -33,7 +34,16 @@ questions(bot)
 bot.login(token);
 console.log("Logging in...")
 
+let interrupted = false;
 process.on('SIGINT', async function() {
+    if (!BackupActive) {
+        console.log("Quitting");
+        process.exit();
+    }
+
+    if (interrupted) process.exit();
+    interrupted = true;
+
 	let original = OpenDatabases.length
 	console.log("Caught interrupt signal, closing " + original + " open databases...")
 

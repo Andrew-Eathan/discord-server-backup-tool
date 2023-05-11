@@ -16,7 +16,7 @@ function makePlaceholders(amount) {
 	return Array(amount).fill("?").join(", ");
 }
 
-function sleep(time) {
+async function sleep(time) {
 	return new Promise(resolve => setTimeout(resolve, time));
 }
 
@@ -26,6 +26,7 @@ const Clean4FS = str => str.toLowerCase().replaceAll(/\_/gm, "").replaceAll(/[^a
 let membersFetchOptions = { format: "png" }
 let emojiFetchOptions = { format: "png" }
 let roleFetchOptions = { format: "png" }
+export let BackupActive = false;
 
 async function GetLinkData(link) {
 	let res = await fetch(link).catch(e => null)
@@ -61,6 +62,8 @@ async function MarkChannelAsSaved(db, id) {
 }
 
 export default async function startBackup(bot, selGuild, selChans, allCategories, allChannels, options, saveFolder) {
+    BackupActive = true;
+
 	// explanation:
 	// we start with no previous chunk so we fetch the first ~100 messages (api limit)
 	// then we find the ID of the earliest message in this chunk and assign it to prevChunk so we know where to continue next
@@ -132,6 +135,7 @@ export default async function startBackup(bot, selGuild, selChans, allCategories
 
 	print("Backup complete!\nWaiting 3 seconds for all remaining async SQL queries to finish and then quitting. Your backup is available in the folder \"" + folder + "\"!")
 
+    BackupActive = false;
 	await sleep(3000);
 	process.exit();
 }
@@ -140,12 +144,12 @@ async function FetchAllMessages(messages, channel, saveOptions, messagesSaved) {
 	let prevID = "";
 	let fetchAmount = 100
 	let options = { limit: fetchAmount };
-	
+
 	// check if there are any messages in this channel to continue from
 	let oldestMessage = await messages.Execute("SELECT MIN(id) FROM messages WHERE channelId = ?", [channel.id]);
-	if (oldestMessage != null) {
-		console.log(oldestMessage);
-		//print(`Resuming backup in this channel from where it stopped! (oldest message id: ${oldestMessage}`)
+	if (oldestMessage != null && oldestMessage["MIN(id)"] != null) {
+		options.before = oldestMessage["MIN(id)"];
+		print(`Resuming backup in this channel from where it stopped! (oldest message id: ${oldestMessage["MIN(id)"]}`)
 	}
 
 	// if a fetch fails this is set to true, if one succeeds it's set to false
@@ -158,7 +162,6 @@ async function FetchAllMessages(messages, channel, saveOptions, messagesSaved) {
 	while (true) {
 		if (skipped) break;
 
-		let fetchStart = Date.now();
 		let msgs = await channel.messages.fetch(options).catch(async err => {
 			if (!didPreviousFetchFail) {
 				didPreviousFetchFail = true;
@@ -298,10 +301,7 @@ async function FetchAllMessages(messages, channel, saveOptions, messagesSaved) {
 
 		print(`Channel "${channel.name}": ${msgCount} messages fetched${totalText}`, false);
 
-		let timeSinceStart = Date.now() - fetchStart;
-		if (timeSinceStart > options.save_interval * 1000)
-			continue;
-		else await sleep(options.save_interval * 1000 - timeSinceStart);
+		await sleep(saveOptions.save_interval * 1000);
 	}
 
 	return msgCount;
@@ -381,6 +381,10 @@ async function SaveRoles(auxdb, roles, selGuild, options) {
 
 	// dont forget to create a new table with members list for each role
 	await roles.Execute("CREATE TABLE IF NOT EXISTS roles (id text, name text, createdTimestamp integer, hoist integer, mentionable integer, tags string, position integer, rawPosition integer, hexColor text, unicodeEmoji text, icon text)");
+    await roles.Execute("CREATE TABLE IF NOT EXISTS rolemembers (memberId text, roleId text)")
+
+    // to get members in roles we need to fetch all guild members
+    await selGuild.members.fetch();
 
     let droles = await selGuild.roles.fetch();
     let idx = 0;
@@ -409,6 +413,9 @@ async function SaveRoles(auxdb, roles, selGuild, options) {
             icondata
         ])
 
+        let members = roles.members.map(m => m.id);
+        console.log(members, "membeds")
+
         let qualitytext = "";
 
         switch (options.save_roles_images) {
@@ -435,6 +442,7 @@ async function SaveMembers(auxdb, members, selGuild, options) {
 
 	let savekeys = [
 		"id",
+        "userId",
 		"username",
 		"discriminator",
 		"tag",
@@ -482,6 +490,8 @@ async function SaveMembers(auxdb, members, selGuild, options) {
 			savedata.push(null);
 			savedata.push(null);
 		}
+
+        savekeys.push("userId"); savedata.push(member?.user.id);
 
 		await members.Execute(`INSERT INTO members (${savekeys.join(", ")}, avatar, banner) VALUES (${makePlaceholders(savedata.length)})`, savedata);
 
