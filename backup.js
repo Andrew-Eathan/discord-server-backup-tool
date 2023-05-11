@@ -4,6 +4,7 @@ import path from "path"
 import fetch from "node-fetch"
 import readline from "readline-sync";
 import { attachmentKeys, attachmentsKeysArr, embedKeys, messageKeys, messageKeysArr } from "./data.js";
+import { SIGINT } from "./index.js";
 
 let spins = ['/', '-', '\\', '|']
 let spin_idx = 0
@@ -37,8 +38,8 @@ async function GetLinkData(link) {
 }
 
 export async function OpenDatabase(folder, name) {
-    print("Opening " + name + " database...")
-    return await SQL.OpenFile(path.resolve(folder, name + ".db"))
+    print("Opening " + name + " database...");
+    return await SQL.OpenFile(path.resolve(folder, name + ".db"));
 }
 
 // helper functions for backup info database
@@ -48,20 +49,18 @@ export async function GetBackupInfo(db, key) {
     else return data.value;
 }
 export async function SetBackupInfo(db, key, value) {
-    console.log("INSERT INTO backupinfo (key, value) VALUES (?, ?)", [key, value])
 	return await db.Execute("INSERT INTO backupinfo (key, value) VALUES (?, ?)", [key, value]);
 }
 async function IsChannelSaved(db, id) {
 	let data = await db.Execute("SELECT * FROM finishedchannels WHERE id = ?", id);
-	console.log("chansave", id, data)
 	return data != null;
 }
 async function MarkChannelAsSaved(db, id) {
 	await db.Execute("INSERT INTO finishedchannels (id) VALUES (?)", id);
-	console.log("chanmarksave", id)
 }
 
 export default async function startBackup(bot, selGuild, selChans, allCategories, allChannels, options, saveFolder) {
+	process.on('SIGINT', SIGINT);
     BackupActive = true;
 
 	// explanation:
@@ -103,15 +102,14 @@ export default async function startBackup(bot, selGuild, selChans, allCategories
 	let alreadyPopulated = await GetBackupInfo(auxdb, "alreadyPopulated");
 	if (alreadyPopulated == null) {
 		for (let chan of selChans) {
-			console.log("INSERT INTO channels (id) VALUES (?)", chan.id)
 			await auxdb.Execute("INSERT INTO channels (id) VALUES (?)", chan.id)
 		}
 
-		await SetBackupInfo(auxdb, "options", JSON.stringify(options))
-		await SetBackupInfo(auxdb, "serverId", selGuild.id)
-		await SetBackupInfo(auxdb, "alreadyPopulated", "yes")
-		print("Populated backup info.")
-	} else print("Using a loaded backup.")
+		await SetBackupInfo(auxdb, "options", JSON.stringify(options));
+		await SetBackupInfo(auxdb, "serverId", selGuild.id);
+		await SetBackupInfo(auxdb, "alreadyPopulated", "yes");
+		print("Populated backup info.");
+	} else print("Using a loaded backup.");
 
 	// the rest
     let messages = await OpenDatabase(folder, "messages");
@@ -141,7 +139,6 @@ export default async function startBackup(bot, selGuild, selChans, allCategories
 }
 
 async function FetchAllMessages(messages, channel, saveOptions, messagesSaved) {
-	let prevID = "";
 	let fetchAmount = 100
 	let options = { limit: fetchAmount };
 
@@ -323,8 +320,12 @@ async function SaveMessages(auxdb, messages, selChans, options) {
 
 	let msgCount = await messages.Execute("SELECT COUNT(*) FROM messages");
 	if (msgCount != null && msgCount["COUNT(*)"] > 0) {
-		console.log("msgcount", msgCount);
 		messagesSaved = msgCount["COUNT(*)"];
+	}
+
+	if (selChans.length == 0) {
+		print("Skipping message backup since no channels were selected.");
+		return;
 	}
 
 	for (let chan of selChans) {
@@ -368,7 +369,7 @@ async function SaveMessages(auxdb, messages, selChans, options) {
 		MarkChannelAsSaved(auxdb, chan.id);
 	}
 
-	//await SetBackupInfo(auxdb, "savedMessages", "yes");
+	await SetBackupInfo(auxdb, "savedMessages", "yes");
 }
 
 async function SaveRoles(auxdb, roles, selGuild, options) {
@@ -380,8 +381,8 @@ async function SaveRoles(auxdb, roles, selGuild, options) {
 	print("Saving roles...");
 
 	// dont forget to create a new table with members list for each role
-	await roles.Execute("CREATE TABLE IF NOT EXISTS roles (id text, name text, createdTimestamp integer, hoist integer, mentionable integer, tags string, position integer, rawPosition integer, hexColor text, unicodeEmoji text, icon text)");
-    await roles.Execute("CREATE TABLE IF NOT EXISTS rolemembers (memberId text, roleId text)")
+	await roles.Execute("CREATE TABLE IF NOT EXISTS roles (id text, name text, createdTimestamp integer, hoist integer, mentionable integer, tags string, position integer, rawPosition integer, hexColor text, unicodeEmoji text, icon text, permissions text)");
+    await roles.Execute("CREATE TABLE IF NOT EXISTS rolemembers (userId text, roleId text)")
 
     // to get members in roles we need to fetch all guild members
     await selGuild.members.fetch();
@@ -399,7 +400,7 @@ async function SaveRoles(auxdb, roles, selGuild, options) {
             }
         }
 
-        await roles.Execute("INSERT INTO roles (id, name, createdTimestamp, hoist, mentionable, tags, position, rawPosition, hexColor, unicodeEmoji, icon) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+        await roles.Execute("INSERT INTO roles (id, name, createdTimestamp, hoist, mentionable, tags, position, rawPosition, hexColor, unicodeEmoji, icon, permissions) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
             role.id,
             role.name,
             role.createdTimestamp,
@@ -410,11 +411,14 @@ async function SaveRoles(auxdb, roles, selGuild, options) {
             role.rawPosition,
             role.hexColor,
             role.unicodeEmoji,
-            icondata
+            icondata,
+			JSON.stringify(role.permissions.serialize())
         ])
 
-        let members = roles.members.map(m => m.id);
-        console.log(members, "membeds")
+        let members = role.members.map(m => m.id);
+		for (let userId of members) {
+			await roles.Execute("INSERT INTO rolemembers (userId, roleId) VALUES (?, ?)", [userId, role.id]);
+		}
 
         let qualitytext = "";
 
@@ -423,7 +427,7 @@ async function SaveRoles(auxdb, roles, selGuild, options) {
             case "f": qualitytext = " (high-res image)"; break;
         }
 
-        print(`${++idx}/${droles.size} roles saved${qualitytext} - ${role.name ?? "unnamed"}`)
+        print(`${++idx}/${droles.size} roles saved${qualitytext} - ${role.name ?? "unnamed"} (${members.length} member(s) have this role)`)
     }
 
     print("Saved roles!")
@@ -442,7 +446,6 @@ async function SaveMembers(auxdb, members, selGuild, options) {
 
 	let savekeys = [
 		"id",
-        "userId",
 		"username",
 		"discriminator",
 		"tag",
@@ -490,8 +493,6 @@ async function SaveMembers(auxdb, members, selGuild, options) {
 			savedata.push(null);
 			savedata.push(null);
 		}
-
-        savekeys.push("userId"); savedata.push(member?.user.id);
 
 		await members.Execute(`INSERT INTO members (${savekeys.join(", ")}, avatar, banner) VALUES (${makePlaceholders(savedata.length)})`, savedata);
 

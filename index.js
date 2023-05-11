@@ -35,7 +35,7 @@ bot.login(token);
 console.log("Logging in...")
 
 let interrupted = false;
-process.on('SIGINT', async function() {
+export async function SIGINT() {
     if (!BackupActive) {
         console.log("Quitting");
         process.exit();
@@ -54,4 +54,4 @@ process.on('SIGINT', async function() {
 
 	console.log("Done. If you want to resume your backup (if it hasn't finished yet), you can do so later!")
 	process.exit();
-});
+}
