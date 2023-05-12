@@ -10,7 +10,7 @@ self-explanatory, this tool saves almost all useful information of a server usin
 - run `node index.js` and go through all the options, then sit back and wait for it to finish :)
 
 ## what this tool does:
-- saves **all** relevant server settings and properties that are listed in the discord API, including server icons and banners
+- saves **all** relevant server settings and properties that are listed in the discord API, including server icons and banners, bans list, and invites list
 - saves all relevant role information, including which members have which roles and role icons (if set)
 - saves all relevant server emoji information, including the emojis themselves
 - saves a list of the settings and properties of each channel in the guild, like position, name, and others
@@ -22,10 +22,9 @@ self-explanatory, this tool saves almost all useful information of a server usin
 - saves all of this in several SQLite databases, which means it can be easily filtered through or processed by any sqlite-capable software/program
 
 ## what this tool can't do (yet)
-- can't save all server invites due to a bug
-- can't save all server bans due to a bug
 - doesn't save more than 100 active and 100 archived threads per channel, because it's a niche necessity that i don't really want to work on
 - doesn't save per-channel permissions, again, a niche necessity
+- doesn't save the guild's audit logs yet
   
 SQL database information coming soon, for now you can look in backup.js to see what the table schemas are :)
   

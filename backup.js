@@ -519,7 +519,7 @@ async function SaveServerInfo(auxdb, serverinfo, selGuild, allChannels, allCateg
 
 	print("Saving server information...")
 	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS serverinfo (type text, data text)")
-	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS bans (id text, user text, reason text)")
+	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS bans (id text, tag text, reason text)")
 	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS invites (code text, temporary integer, maxAge integer, uses integer, maxUses integer, inviterId integer, createdAt integer, expiresAt integer, url text)")
 	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS emojis (id text, name text, animated integer, authorId text, createdAt integer, identifier text, requiresColons integer, url text, image blob)")
 	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS channels (name text, type text, id text, parentId text, position integer, rawPosition integer, createdAt integer, nsfw integer, lastMessageId text, topic text, rateLimitPerUser integer, bitrate integer, rtcRegion text, userLimit integer)")
@@ -598,9 +598,9 @@ async function SaveServerInfo(auxdb, serverinfo, selGuild, allChannels, allCateg
 		let bans = await selGuild.bans.fetch();
 
 		for (let pairs of bans) {
-			await serverinfo.Execute("INSERT INTO bans (id, user, reason) VALUES (?, ?, ?)", [
-				id,
-				pairs[1].user,
+			await serverinfo.Execute("INSERT INTO bans (id, tag, reason) VALUES (?, ?, ?)", [
+				pairs[1].user?.id,
+                pairs[1].user?.tag,
 				pairs[1].reason
 			]);
 		}
@@ -645,9 +645,8 @@ async function SaveServerInfo(auxdb, serverinfo, selGuild, allChannels, allCateg
 	try {
 		let invites = await selGuild.invites.fetch();
 
-		// indexed by code
-		for (let code in invites) {
-			let invite = invites[code];
+		for (let pairs of invites) {
+			let invite = pairs[1];
 
 			await serverinfo.Execute("INSERT INTO invites (code, temporary, maxAge, uses, maxUses, inviterId, createdat, expiresat, url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [
 				invite.code,
