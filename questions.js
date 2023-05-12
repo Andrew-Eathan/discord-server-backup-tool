@@ -18,7 +18,7 @@ export default async bot => {
 		console.log("Loaded in as " + bot.user.tag + "!")
 
 		let list = []
-        let backup_options = JSON.parse(JSON.stringify(chosen_options))
+		let backup_options = JSON.parse(JSON.stringify(chosen_options))
 
 		console.log("Do you have an unfinished backup? If yes, you can resume it by typing yes.\nTo begin a new server backup process, type no.\n(yes/no)");
 
@@ -42,45 +42,45 @@ export default async bot => {
 				}
 			})
 
-            // restore everything
-            let auxdb = await OpenDatabase(folder, "backupinfo")
-            backup_options = JSON.parse(await GetBackupInfo(auxdb, "options"));
-            console.log("Restored options:", backup_options)
+			// restore everything
+			let auxdb = await OpenDatabase(folder, "backupinfo")
+			backup_options = JSON.parse(await GetBackupInfo(auxdb, "options"));
+			console.log("Restored options:", backup_options)
 
-            let id = await GetBackupInfo(auxdb, "serverId");
-            let guild = await bot.guilds.fetch(id);
-            if (guild == null) {
-                console.log("Failed to load backup, your account can't access the server from the backup (usually means you aren't in the server) server id: " + id)
-                process.exit()
-            }
+			let id = await GetBackupInfo(auxdb, "serverId");
+			let guild = await bot.guilds.fetch(id);
+			if (guild == null) {
+				console.log("Failed to load backup, your account can't access the server from the backup (usually means you aren't in the server) server id: " + id)
+				process.exit()
+			}
 
-            console.log("Loaded guild from backup: " + guild.name)
+			console.log("Loaded guild from backup: " + guild.name)
 
-            let selChans = []
-            let chansDatabase = await auxdb.ExecuteAll("SELECT * FROM channels");
-            let fetchedChannels = await guild.channels.fetch();
-            for (let ch of chansDatabase) {
-                let chan = fetchedChannels.get(ch.id);
-                if (chan == null) {
-                    console.log("A channel from the backup wasn't found on the server. (it was probably either deleted after the backup, or something else failed) channel id: " + ch.id);
-                    console.log("Skipping this channel.")
-                    continue;
-                }
+			let selChans = []
+			let chansDatabase = await auxdb.ExecuteAll("SELECT * FROM channels");
+			let fetchedChannels = await guild.channels.fetch();
+			for (let ch of chansDatabase) {
+				let chan = fetchedChannels.get(ch.id);
+				if (chan == null) {
+					console.log("A channel from the backup wasn't found on the server. (it was probably either deleted after the backup, or something else failed) channel id: " + ch.id);
+					console.log("Skipping this channel.")
+					continue;
+				}
 
-                console.log("Found channel from backup: " + chan.name + " - type: " + chan.type)
-                selChans.push(chan)
-            }
+				console.log("Found channel from backup: " + chan.name + " - type: " + chan.type)
+				selChans.push(chan)
+			}
 
-            let fancyCatList = []
-            fetchedChannels.forEach(channel => {
-                if (channel.type == "GUILD_CATEGORY") {
-                    fancyCatList.push(channel);
-                }
-            })
+			let fancyCatList = []
+			fetchedChannels.forEach(channel => {
+				if (channel.type == "GUILD_CATEGORY") {
+					fancyCatList.push(channel);
+				}
+			})
 
-            console.log("Starting backup...")
-            setTimeout(_ => startBackup(bot, guild, selChans, fancyCatList, fetchedChannels, backup_options, folder), 1000)
-            return;
+			console.log("Starting backup...")
+			setTimeout(_ => startBackup(bot, guild, selChans, fancyCatList, fetchedChannels, backup_options, folder), 1000)
+			return;
 		}
 
 		let dguilds = await bot.guilds.fetch();
@@ -95,7 +95,7 @@ export default async bot => {
 		}
 
 		selGuild = list[cmdGetNumber(val => isValid(list[val]))]
-        selGuild = await selGuild.fetch();
+		selGuild = await selGuild.fetch();
 
 		console.log(`Selected guild! (${selGuild.name})`);
 		console.log()
@@ -236,66 +236,66 @@ export default async bot => {
 			doneChSel = key == "done" || fancyChList.length == 0;
 		}
 
-        // remove nocategory
+		// remove nocategory
 		fancyCatList.shift();
 
 		console.log(selChans.length + " channels selected!")
-        console.log()
-        console.log("Now, specify some options for the backup process.")
-        console.log("Type y/n, or an option depending on the question:")
+		console.log()
+		console.log("Now, specify some options for the backup process.")
+		console.log("Type y/n, or an option depending on the question:")
 
-        Object.keys(backup_options).forEach(key => {
-            let option = backup_options[key]
-            console.log()
-            console.log(option.text);
+		Object.keys(backup_options).forEach(key => {
+			let option = backup_options[key]
+			console.log()
+			console.log(option.text);
 
-            while (true) {
-                let answer = cmdGetString(val => {
+			while (true) {
+				let answer = cmdGetString(val => {
 					// allow screwed up numbers, the number handler will check if it's a messed up number
 					if (option.type == "number") return true;
-                    if (!option.not_precise && !option.accepted.includes(val)) return false;
-                    return true;
-                })
+					if (!option.not_precise && !option.accepted.includes(val)) return false;
+					return true;
+				})
 
-                if (answer == "") {
-                    backup_options[key] = option.default;
-                    break;
-                }
+				if (answer == "") {
+					backup_options[key] = option.default;
+					break;
+				}
 
-                process_answer:
-                {
-                    switch (option.type) {
-                        case "bool":
-                            backup_options[key] = answer == "y" ? true : false
-                        break;
-                        case "number":
-                            let num = Number(answer)
-                            if (isNaN(num)) {
-                                console.log("Please type a valid number!")
-                                break process_answer;
-                            }
-                            if (num < option.min || num > option.max) {
-                                console.log("Number outside allowed range!")
-                                break process_answer;
-                            }
+				process_answer:
+				{
+					switch (option.type) {
+						case "bool":
+							backup_options[key] = answer == "y" ? true : false
+						break;
+						case "number":
+							let num = Number(answer)
+							if (isNaN(num)) {
+								console.log("Please type a valid number!")
+								break process_answer;
+							}
+							if (num < option.min || num > option.max) {
+								console.log("Number outside allowed range!")
+								break process_answer;
+							}
 
-                            backup_options[key] = num
-                        break;
-                        default:
-                            backup_options[key] = answer
-                        break;
-                    }
-                    break;
-                }
-            }
-        })
+							backup_options[key] = num
+						break;
+						default:
+							backup_options[key] = answer
+						break;
+					}
+					break;
+				}
+			}
+		})
 
-        console.log("Your options:")
-        console.log(backup_options)
+		console.log("Your options:")
+		console.log(backup_options)
 
-        console.log()
-        console.log("Backup will begin in 3 seconds...")
+		console.log()
+		console.log("Backup will begin in 3 seconds...")
 
-        setTimeout(_ => startBackup(bot, selGuild, selChans, fancyCatList, allChannels, backup_options), 3000)
+		setTimeout(_ => startBackup(bot, selGuild, selChans, fancyCatList, allChannels, backup_options), 3000)
 	})
 }

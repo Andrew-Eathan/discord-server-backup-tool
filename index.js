@@ -1,7 +1,7 @@
 
 console.log("-------------------------------------------")
 console.log("|andreweathan's discord server backup tool|")
-console.log("|           R  E  W  R  I  T  E           |")
+console.log("|			 R	E  W  R  I	T  E		   |")
 console.log("-------------------------------------------")
 console.log()
 
@@ -19,8 +19,8 @@ if (token.length <= 0)
 let bot = new Discord.Client({
 	intents: Discord.Intents.ALL, /*[
 		1, // guilds
-        2, // members
-    	4, // guild bans
+		2, // members
+		4, // guild bans
 		256, // presences
 		512, // messages
 		32768, // message content
@@ -36,13 +36,13 @@ console.log("Logging in...")
 
 let interrupted = false;
 export async function SIGINT() {
-    if (!BackupActive) {
-        console.log("Quitting");
-        process.exit();
-    }
+	if (!BackupActive) {
+		console.log("Quitting");
+		process.exit();
+	}
 
-    if (interrupted) process.exit();
-    interrupted = true;
+	if (interrupted) process.exit();
+	interrupted = true;
 
 	let original = OpenDatabases.length
 	console.log("Caught interrupt signal, closing " + original + " open databases...")

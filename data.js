@@ -26,7 +26,7 @@ export const attachmentsKeysArr = [
 ]
 
 export const messageKeys
-	  = "id text, authorId text, channelId text, applicationId text, type text, content text, createdTimestamp integer, editedTimestamp integer, " + 
+	  = "id text, authorId text, channelId text, applicationId text, type text, content text, createdTimestamp integer, editedTimestamp integer, " +
 		"hasThread integer, threadId text, embedCount integer, pinned integer, system integer, tts integer, activity text, attachmentCount integer, referenceChannelId text, referenceGuildId text, referenceMessageId text"
 
 export const attachmentKeys = "messageId text, attachmentId, contentType text, description text, duration real, ephemeral integer, width integer, height integer, id text, name text, size integer, spoiler integer"
@@ -77,7 +77,7 @@ export let chosen_options = {
 			"y", "n"
 		],
 		type: "bool"
-    },*/
+	},*/
 	"save_embeds": {
 		text: "Save all message embed data?\nNote: This isn't recommended, it takes up a lot of space in the end, but most bots use embeds in their messages, so if you disable this, you won't save those emeds.",
 		default: false,

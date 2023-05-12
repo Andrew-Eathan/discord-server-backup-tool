@@ -9,7 +9,7 @@ import { SIGINT } from "./index.js";
 let spins = ['/', '-', '\\', '|']
 let spin_idx = 0
 function print(data, inplace) {
-    process.stdout.write(`${spins[spin_idx++]} ${data}           \r` + (inplace ? "" : "\n"))
+	process.stdout.write(`${spins[spin_idx++]} ${data}\r` + (inplace ? "" : "\n"))
 	spin_idx = spin_idx % spins.length;
 }
 
@@ -38,15 +38,15 @@ async function GetLinkData(link) {
 }
 
 export async function OpenDatabase(folder, name) {
-    print("Opening " + name + " database...");
-    return await SQL.OpenFile(path.resolve(folder, name + ".db"));
+	print("Opening " + name + " database...");
+	return await SQL.OpenFile(path.resolve(folder, name + ".db"));
 }
 
 // helper functions for backup info database
 export async function GetBackupInfo(db, key) {
 	let data = await db.Execute("SELECT * FROM backupinfo WHERE key = ?", key);
-    if (data == null) return null;
-    else return data.value;
+	if (data == null) return null;
+	else return data.value;
 }
 export async function SetBackupInfo(db, key, value) {
 	return await db.Execute("INSERT INTO backupinfo (key, value) VALUES (?, ?)", [key, value]);
@@ -61,7 +61,7 @@ async function MarkChannelAsSaved(db, id) {
 
 export default async function startBackup(bot, selGuild, selChans, allCategories, allChannels, options, saveFolder) {
 	process.on('SIGINT', SIGINT);
-    BackupActive = true;
+	BackupActive = true;
 
 	// explanation:
 	// we start with no previous chunk so we fetch the first ~100 messages (api limit)
@@ -69,29 +69,29 @@ export default async function startBackup(bot, selGuild, selChans, allCategories
 	// we continue this until we hit <100 messages in a fetch, which means we've reached the channel's end
 	// then continue to the next channel, and go on until the end, where we save this information
 
-    if (options.save_members_images == "y")
-        membersFetchOptions.size = 128;
+	if (options.save_members_images == "y")
+		membersFetchOptions.size = 128;
 
-    if (options.save_emoji_images == "y")
-        emojiFetchOptions.size = 128;
+	if (options.save_emoji_images == "y")
+		emojiFetchOptions.size = 128;
 
-    if (options.save_role_images == "y")
-        roleFetchOptions.size = 128;
+	if (options.save_role_images == "y")
+		roleFetchOptions.size = 128;
 
-    let folder = saveFolder ?? Clean4FS(selGuild.name)
+	let folder = saveFolder ?? Clean4FS(selGuild.name)
 
-    if (!saveFolder)
-        if (fs.existsSync(folder))
-        {
-            let add = 1;
+	if (!saveFolder)
+		if (fs.existsSync(folder))
+		{
+			let add = 1;
 
-            while (fs.existsSync(folder + "_" + add)) {
-                add++;
-            }
+			while (fs.existsSync(folder + "_" + add)) {
+				add++;
+			}
 
-            folder = folder + "_" + add;
-            fs.mkdirSync(folder)
-        } else fs.mkdirSync(folder);
+			folder = folder + "_" + add;
+			fs.mkdirSync(folder)
+		} else fs.mkdirSync(folder);
 
 	// populate backup info
 	let auxdb = await OpenDatabase(folder, "backupinfo");
@@ -112,28 +112,28 @@ export default async function startBackup(bot, selGuild, selChans, allCategories
 	} else print("Using a loaded backup.");
 
 	// the rest
-    let messages = await OpenDatabase(folder, "messages");
+	let messages = await OpenDatabase(folder, "messages");
 
-    let serverinfo = false;
-    let roles = false;
-    let members = false;
-    if (options.save_server_data) {
-        serverinfo = await OpenDatabase(folder, "serverinfo")
-        roles = await OpenDatabase(folder, "roles")
-        members = await OpenDatabase(folder, "members")
-    }
+	let serverinfo = false;
+	let roles = false;
+	let members = false;
+	if (options.save_server_data) {
+		serverinfo = await OpenDatabase(folder, "serverinfo")
+		roles = await OpenDatabase(folder, "roles")
+		members = await OpenDatabase(folder, "members")
+	}
 
-    if (serverinfo) {
-        await SaveServerInfo(auxdb, serverinfo, selGuild, allChannels, allCategories, options);
+	if (serverinfo) {
+		await SaveServerInfo(auxdb, serverinfo, selGuild, allChannels, allCategories, options);
 		await SaveRoles(auxdb, roles, selGuild, options);
 		await SaveMembers(auxdb, members, selGuild, options);
-    }
+	}
 
-    await SaveMessages(auxdb, messages, selChans, options);
+	await SaveMessages(auxdb, messages, selChans, options);
 
 	print("Backup complete!\nWaiting 3 seconds for all remaining async SQL queries to finish and then quitting. Your backup is available in the folder \"" + folder + "\"!")
 
-    BackupActive = false;
+	BackupActive = false;
 	await sleep(3000);
 	process.exit();
 }
@@ -195,8 +195,8 @@ async function FetchAllMessages(messages, channel, saveOptions, messagesSaved) {
 
 		if (msgs == "retry") continue;
 
-        // so that the fetch continues from this ID
-        if (msgs.size > 0) {
+		// so that the fetch continues from this ID
+		if (msgs.size > 0) {
 			let earliestMessage;
 			let earliestDate = Infinity;
 
@@ -209,12 +209,12 @@ async function FetchAllMessages(messages, channel, saveOptions, messagesSaved) {
 				}
 			}
 
-            options.before = earliestMessage.id
-        }
+			options.before = earliestMessage.id
+		}
 
 		msgCount += msgs.size;
 
-        for (let pairs of msgs) {
+		for (let pairs of msgs) {
 			let msg = pairs[1];
 			let savekeys = [];
 			let savedata = [];
@@ -282,7 +282,7 @@ async function FetchAllMessages(messages, channel, saveOptions, messagesSaved) {
 				}
 
 			messages.Execute(`INSERT INTO messages (${savekeys.join(", ")}) VALUES (${makePlaceholders(savekeys.length)})`, savedata);
-        }
+		}
 
 		let totalText = " - " + (messagesSaved + msgCount);
 		if (saveOptions.total_message_count != -1) {
@@ -311,7 +311,7 @@ async function SaveMessages(auxdb, messages, selChans, options) {
 		return;
 	}
 
-    print("Saving messages...");
+	print("Saving messages...");
 
 	await messages.Execute(`CREATE TABLE IF NOT EXISTS messages (${messageKeys})`);
 	await messages.Execute(`CREATE TABLE IF NOT EXISTS attachments (${attachmentKeys})`);
@@ -383,55 +383,55 @@ async function SaveRoles(auxdb, roles, selGuild, options) {
 
 	// dont forget to create a new table with members list for each role
 	await roles.Execute("CREATE TABLE IF NOT EXISTS roles (id text, name text, createdTimestamp integer, hoist integer, mentionable integer, tags string, position integer, rawPosition integer, hexColor text, unicodeEmoji text, icon text, permissions text)");
-    await roles.Execute("CREATE TABLE IF NOT EXISTS rolemembers (userId text, roleId text)")
+	await roles.Execute("CREATE TABLE IF NOT EXISTS rolemembers (userId text, roleId text)")
 
-    // to get members in roles we need to fetch all guild members
-    await selGuild.members.fetch();
+	// to get members in roles we need to fetch all guild members
+	await selGuild.members.fetch();
 
-    let droles = await selGuild.roles.fetch();
-    let idx = 0;
-    for (let pairs of droles) {
-        let role = pairs[1];
-        let icondata = null;
+	let droles = await selGuild.roles.fetch();
+	let idx = 0;
+	for (let pairs of droles) {
+		let role = pairs[1];
+		let icondata = null;
 
-        if (options.save_role_images != "n") {
-            let url = role.iconURL(roleFetchOptions);
-            if (url) {
-                icondata = await GetLinkData(url);
-            }
-        }
+		if (options.save_role_images != "n") {
+			let url = role.iconURL(roleFetchOptions);
+			if (url) {
+				icondata = await GetLinkData(url);
+			}
+		}
 
-        await roles.Execute("INSERT INTO roles (id, name, createdTimestamp, hoist, mentionable, tags, position, rawPosition, hexColor, unicodeEmoji, icon, permissions) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
-            role.id,
-            role.name,
-            role.createdTimestamp,
-            role.hoist,
-            role.mentionable,
-            JSON.stringify(role.tags),
-            role.position,
-            role.rawPosition,
-            role.hexColor,
-            role.unicodeEmoji,
-            icondata,
+		await roles.Execute("INSERT INTO roles (id, name, createdTimestamp, hoist, mentionable, tags, position, rawPosition, hexColor, unicodeEmoji, icon, permissions) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+			role.id,
+			role.name,
+			role.createdTimestamp,
+			role.hoist,
+			role.mentionable,
+			JSON.stringify(role.tags),
+			role.position,
+			role.rawPosition,
+			role.hexColor,
+			role.unicodeEmoji,
+			icondata,
 			JSON.stringify(role.permissions.serialize())
-        ])
+		])
 
-        let members = role.members.map(m => m.id);
+		let members = role.members.map(m => m.id);
 		for (let userId of members) {
 			await roles.Execute("INSERT INTO rolemembers (userId, roleId) VALUES (?, ?)", [userId, role.id]);
 		}
 
-        let qualitytext = "";
+		let qualitytext = "";
 
-        switch (options.save_roles_images) {
-            case "y": qualitytext = " (low-res image)"; break;
-            case "f": qualitytext = " (high-res image)"; break;
-        }
+		switch (options.save_roles_images) {
+			case "y": qualitytext = " (low-res image)"; break;
+			case "f": qualitytext = " (high-res image)"; break;
+		}
 
-        print(`${++idx}/${droles.size} roles saved${qualitytext} - ${role.name ?? "unnamed"} (${members.length} member(s) have this role)`)
-    }
+		print(`${++idx}/${droles.size} roles saved${qualitytext} - ${role.name ?? "unnamed"} (${members.length} member(s) have this role)`)
+	}
 
-    print("Saved roles!")
+	print("Saved roles!")
 	await SetBackupInfo(auxdb, "savedRoles", "yes");
 }
 
@@ -497,14 +497,14 @@ async function SaveMembers(auxdb, members, selGuild, options) {
 
 		await members.Execute(`INSERT INTO members (${savekeys.join(", ")}, avatar, banner) VALUES (${makePlaceholders(savedata.length)})`, savedata);
 
-        let qualitytext = "";
+		let qualitytext = "";
 
-        switch (options.save_members_images) {
-            case "y": qualitytext = " (low-res image)"; break;
-            case "f": qualitytext = " (high-res image)"; break;
-        }
+		switch (options.save_members_images) {
+			case "y": qualitytext = " (low-res image)"; break;
+			case "f": qualitytext = " (high-res image)"; break;
+		}
 
-        print(`${++idx}/${gmembers.size} members saved${qualitytext} - ${member?.user?.tag ?? "unnamed"}`)
+		print(`${++idx}/${gmembers.size} members saved${qualitytext} - ${member?.user?.tag ?? "unnamed"}`)
 	}
 
 	print("Saved members!")
@@ -608,17 +608,17 @@ async function SaveServerInfo(auxdb, serverinfo, selGuild, allChannels, allCateg
 		print("Couldn't save bans list, your account probably doesn't have the permission to see them. (" + e + ")");
 	}
 
-    print("Saving emojis...")
+	print("Saving emojis...")
 	let emojis = await selGuild.emojis.fetch()
-    let idx = 0;
+	let idx = 0;
 	for (let pairs of emojis) {
 		let emoji = pairs[1];
 		let imagedata = null;
 
 		if (options.save_emoji_images != "n") {
-            let suffix = options.save_emoji_images == "y" ? "?size=64" : ""
+			let suffix = options.save_emoji_images == "y" ? "?size=64" : ""
 			imagedata = await GetLinkData(emoji.url + suffix)
-        }
+		}
 
 		await serverinfo.Execute("INSERT INTO emojis (id, name, animated, authorId, createdAt, identifier, requiresColons, url, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [
 			emoji?.id, // why are all of these nullable wtf discord
@@ -632,14 +632,14 @@ async function SaveServerInfo(auxdb, serverinfo, selGuild, allChannels, allCateg
 			imagedata
 		]);
 
-        let qualitytext = "";
+		let qualitytext = "";
 
-        switch (options.save_emoji_images) {
-            case "y": qualitytext = " (low-res)"; break;
-            case "f": qualitytext = " (high-res)"; break;
-        }
+		switch (options.save_emoji_images) {
+			case "y": qualitytext = " (low-res)"; break;
+			case "f": qualitytext = " (high-res)"; break;
+		}
 
-        print(`${++idx}/${emojis.size} emojis saved${qualitytext} - :${emoji?.name ?? "unnamed"}:`)
+		print(`${++idx}/${emojis.size} emojis saved${qualitytext} - :${emoji?.name ?? "unnamed"}:`)
 	}
 
 	try {
