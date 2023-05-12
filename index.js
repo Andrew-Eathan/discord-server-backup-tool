@@ -1,7 +1,6 @@
-
 console.log("-------------------------------------------")
 console.log("|andreweathan's discord server backup tool|")
-console.log("|			 R	E  W  R  I	T  E		   |")
+console.log("|           R  E  W  R  I  T  E           |")
 console.log("-------------------------------------------")
 console.log()
 
