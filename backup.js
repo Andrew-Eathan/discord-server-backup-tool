@@ -166,7 +166,7 @@ async function FetchAllMessages(messages, channel, saveOptions, messagesSaved) {
 				print("[ ERROR ]");
 				print(`Couldn't fetch messages from channel "${channel.name}" (TYPE: ${channel.type})`)
 				print(`Error message: ${err}`);
-				print(`Automatically retrying to fetch messages every 10 seconds. To skip this channel, type "skip".`);
+				print(`To retry, press ENTER. To skip this channel, type "skip".`);
 			} else {
 				await sleep(1000);
 				return "retry";
@@ -597,11 +597,11 @@ async function SaveServerInfo(auxdb, serverinfo, selGuild, allChannels, allCateg
 	try {
 		let bans = await selGuild.bans.fetch();
 
-		for (let id in bans) {
+		for (let pairs of bans) {
 			await serverinfo.Execute("INSERT INTO bans (id, user, reason) VALUES (?, ?, ?)", [
 				id,
-				bans[id].user,
-				bans[id].reason
+				pairs[1].user,
+				pairs[1].reason
 			]);
 		}
 	} catch(e) {

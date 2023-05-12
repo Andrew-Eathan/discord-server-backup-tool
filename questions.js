@@ -58,7 +58,6 @@ export default async bot => {
 
             let selChans = []
             let chansDatabase = await auxdb.ExecuteAll("SELECT * FROM channels");
-            console.log("chchhv", chansDatabase)
             let fetchedChannels = await guild.channels.fetch();
             for (let ch of chansDatabase) {
                 let chan = fetchedChannels.get(ch.id);
@@ -90,13 +89,13 @@ export default async bot => {
 
 		let k = 0;
 		for (let pairs of dguilds) {
-			let guild = await pairs[1].fetch();
 			k++;
-			console.log(`${k}: ${guild.name} (${guild.memberCount} member(s))`)
-			list[k] = guild
+			console.log(`${k}: ${pairs[1].name}`)
+			list[k] = pairs[1]
 		}
 
 		selGuild = list[cmdGetNumber(val => isValid(list[val]))]
+        selGuild = await selGuild.fetch();
 
 		console.log(`Selected guild! (${selGuild.name})`);
 		console.log()
@@ -118,13 +117,13 @@ export default async bot => {
 		// category 2
 		// - channel 1
 
-		fancyCatList.push({ name: "noparent", id: "noparent" })
+		fancyCatList.push({ name: "nocategory", id: "nocategory" })
 
 		selGuild.channels.cache.forEach(ch => {
 			switch (ch.type) {
 				case "GUILD_TEXT":
 				case "GUILD_VOICE": {
-					let key = ch?.parentId ?? "noparent"
+					let key = ch?.parentId ?? "nocategory"
 					fancyChList[key] = fancyChList[key] ?? []
 					fancyChList[key].push(ch)
 				} break;
@@ -237,6 +236,7 @@ export default async bot => {
 			doneChSel = key == "done" || fancyChList.length == 0;
 		}
 
+        // remove nocategory
 		fancyCatList.shift();
 
 		console.log(selChans.length + " channels selected!")
