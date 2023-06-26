@@ -7,7 +7,7 @@ self-explanatory, this tool saves almost all useful information of a server usin
 - install node.js if you haven't already
 - run `npm i` in the repo folder to install all of the packages
 - create a new file called ".env" and write "TOKEN=youraccounttokenhere" in it, can be either a bot or a user token (read at the end)
-- run `node index.js` and go through all the options, then sit back and wait for it to finish :)
+- run `node backuptool.js` and go through all the options, then sit back and wait for it to finish :)
 
 ## what this tool does:
 - saves **all** relevant server settings and properties that are listed in the discord API, including server icons and banners, bans list, and invites list

@@ -102,3 +102,339 @@ export let chosen_options = {
 	}
 }
 
+// used in export tool
+export let serverinfoDataLookup = {
+    "afkChannelId": {
+        name: "AFK Channel",
+        type: "channel"
+    },
+    "afkTimeout": {
+        name: "AFK Timeout (time until user considered AFK and moved)",
+    },
+    "createdTimestamp": {
+        name: "Server creation date",
+        type: "date"
+    },
+    "description": {
+        name: "Server description"
+    },
+    "explicitContentFilter": {
+        name: "Explicit content filter"
+    },
+    "verificationLevel": {
+        name: "Server verification level"
+    },
+    "defaultMessageNotifications": {
+        name: "Default message notification setting"
+    },
+    "id": {
+        name: "Server ID"
+    },
+    "maximumBitrate": {
+        name: "Maximum voice channel bitrate"
+    },
+    "maximumMembers": {
+        name: "Maximum members"
+    },
+    "maximumPresences": {
+        name: "Maximum user presences"
+    },
+    "maxStageVideoChannelUsers": {
+        name: "Maximum stage video channel users"
+    },
+    "maxVideoChannelUsers": {
+        name: "Maximum video channel users"
+    },
+    "memberCount": {
+        name: "Member count"
+    },
+    "mfaLevel": {
+        name: "Multi-Factor Authentication level"
+    },
+    "name": {
+        name: "Server name"
+    },
+    "nameAcronym": {
+        name: "Server name acronym"
+    },
+    "nsfwLevel": {
+        name: "NSFW level"
+    },
+    "ownerId": {
+        name: "Owner",
+        type: "user"
+    },
+    "partnered": {
+        name: "Is server partnered",
+        type: "bool"
+    },
+    "preferredLocale": {
+        name: "Preferred location"
+    },
+    "premiumProgressBarEnabled": {
+        name: "Boost progress bar enabled",
+        type: "bool"
+    },
+    "premiumSubscriptionCount": {
+        name: "Server boosts"
+    },
+    "premiumTier": {
+        name: "Server boost tier"
+    },
+    "publicUpdatesChannelId": {
+        name: "Public updates channel",
+        type: "channel"
+    },
+    "rulesChannelId": {
+        name: "Rules channel",
+        type: "channel"
+    },
+    "systemChannelId": {
+        name: "System channel",
+        type: "channel"
+    },
+    "widgetChannelId": {
+        name: "Widget channel",
+        type: "channel"
+    },
+    "verified": {
+        name: "Is server verified",
+        type: "bool"
+    },
+    "widgetEnabled": {
+        name: "Widget images enabled",
+        type: "bool"
+    },
+    "features": {
+        name: "Server features",
+        type: "json"
+    },
+    "icon": {
+        name: "Server icon",
+        type: "image",
+        filename: "icon.png"
+    }
+}
+
+export let channelKeysLookup = {
+    name: {
+        name: "Name"
+    },
+    type: {
+        name: "Type"
+    },
+    id: {
+        name: "ID"
+    },
+    parentId: {
+        name: "Parent channel",
+        type: "channel"
+    },
+    position: {
+        name: "Position"
+    },
+    rawPosition: {
+        name: "Raw position"
+    },
+    createdAt: {
+        name: "Created at",
+        type: "date"
+    },
+    nsfw: {
+        name: "Is NSFW",
+        type: "bool"
+    },
+    lastMessageId: {
+        name: "Last known message ID"
+    },
+    topic: {
+        name: "Topic"
+    },
+    rateLimitPerUser: {
+        name: "Slowmode"
+    },
+    bitrate: {
+        name: "Bitrate"
+    },
+    rtcRegion: {
+        name: "RTC Region"
+    },
+    userLimit: {
+        name: "User limit"
+    }
+}
+
+export let memberKeysLookup = {
+    id: {
+        name: "ID"
+    },
+    discriminator: {
+        name: "Discriminator (tag numbers)"
+    },
+    tag: {
+        name: "Tag"
+    },
+    nickname: {
+        name: "Nickname"
+    },
+    username: {
+        name: "Username"
+    },
+    createdTimestamp: {
+        name: "Created at",
+        type: "date"
+    },
+    bot: {
+        name: "Is a bot",
+        type: "bool"
+    },
+    system: {
+        name: "Is part of Discord",
+        type: "bool"
+    },
+    communicationDisabledTimestamp: {
+        name: "Timed out at",
+        type: "date"
+    },
+    displayHexColor: {
+        name: "Member hex color"
+    },
+    joinedTimestamp: {
+        name: "Joined at",
+        type: "date"
+    },
+    pending: {
+        name: "Pending (not fully joined)",
+        type: "bool"
+    },
+    premiumSinceTimestamp: {
+        name: "Boosting since",
+        type: "date"
+    },
+    avatar: {
+        name: "Avatar",
+        type: "image",
+        filename: "avatar.png"
+    },
+    banner: {
+        name: "Banner",
+        type: "image",
+        filename: "banner.png"
+    },
+}
+
+export let inviteKeysLookup = {
+    code: {
+        name: "Code"
+    },
+    temporary: {
+        name: "Temporary invite",
+        type: "bool"
+    },
+    maxAge: {
+        name: "Expires after",
+        type: "time",
+        unit: "seconds"
+    },
+    uses: {
+        name: "Uses"
+    },
+    maxUses: {
+        name: "Maximum uses"
+    },
+    inviterId: {
+        name: "Inviter",
+        type: "user"
+    },
+    createdAt: {
+        name: "Created at",
+        type: "date"
+    },
+    expiresAt: {
+        name: "Expires at",
+        type: "date"
+    },
+    url: {
+        name: "URL"
+    }
+}
+
+export let emojiKeysLookup = {
+    id: {
+        name: "ID"
+    },
+    name: {
+        name: "Name"
+    },
+    animated: {
+        name: "Is animated",
+        type: "bool"
+    },
+    authorId: {
+        name: "Created by",
+        type: "user"
+    },
+    createdAt: {
+        name: "Created at",
+        type: "date"
+    },
+    identifier: {
+        name: "Identifier"
+    },
+    requiresColons: {
+        name: "Requires colons",
+        type: "bool"
+    },
+    url: {
+        name: "URL"
+    },
+    image: {
+        name: "Emoji image",
+        type: "image",
+        filename: "emoji.png"
+    }
+}
+
+export let roleKeysLookup = {
+    id: {
+        name: "ID"
+    },
+    name: {
+        name: "Name"
+    },
+    createdTimestamp: {
+        name: "Created at",
+        type: "date"
+    },
+    hoist: {
+        name: "Displays members with this role separately",
+        type: "bool"
+    },
+    mentionable: {
+        name: "Can be mentioned",
+        type: "bool"
+    },
+    tags: {
+        name: "Tags"
+    },
+    position: {
+        name: "Position in category"
+    },
+    rawPosition: {
+        name: "Total position in server"
+    },
+    hexColor: {
+        name: "Hex color"
+    },
+    unicodeEmoji: {
+        name: "Unicode emoji"
+    },
+    icon: {
+        name: "Icon",
+        type: "image",
+        filename: "icon.png"
+    },
+    permissions: {
+        name: "Permissions"
+    }
+}

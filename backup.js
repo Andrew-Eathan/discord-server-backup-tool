@@ -4,7 +4,8 @@ import path from "path"
 import fetch from "node-fetch"
 import readline from "readline-sync";
 import { attachmentKeys, attachmentsKeysArr, embedKeys, messageKeys, messageKeysArr } from "./data.js";
-import { SIGINT } from "./index.js";
+import { SIGINT } from "./backuptool.js";
+import { Clean4FS } from "./util.js"
 
 let spins = ['/', '-', '\\', '|']
 let spin_idx = 0
@@ -21,7 +22,6 @@ async function sleep(time) {
 	return new Promise(resolve => setTimeout(resolve, time));
 }
 
-const Clean4FS = str => str.toLowerCase().replaceAll(/\_/gm, "").replaceAll(/[^a-zA-Z0-9\(\)\s\-]+/gm, "_");
 
 // these are later modified to fetch a low/high size based on the image size
 let membersFetchOptions = { format: "png" }
@@ -520,7 +520,7 @@ async function SaveServerInfo(auxdb, serverinfo, selGuild, allChannels, allCateg
 	print("Saving server information...")
 	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS serverinfo (type text, data text)")
 	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS bans (id text, tag text, reason text)")
-	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS invites (code text, temporary integer, maxAge integer, uses integer, maxUses integer, inviterId integer, createdAt integer, expiresAt integer, url text)")
+	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS invites (code text, temporary integer, maxAge integer, uses integer, maxUses integer, inviterId text, createdAt integer, expiresAt integer, url text)")
 	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS emojis (id text, name text, animated integer, authorId text, createdAt integer, identifier text, requiresColons integer, url text, image blob)")
 	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS channels (name text, type text, id text, parentId text, position integer, rawPosition integer, createdAt integer, nsfw integer, lastMessageId text, topic text, rateLimitPerUser integer, bitrate integer, rtcRegion text, userLimit integer)")
 
@@ -534,7 +534,6 @@ async function SaveServerInfo(auxdb, serverinfo, selGuild, allChannels, allCateg
 		"createdTimestamp",
 		"description",
 		"explicitContentFilter",
-		"verificationLevel",
 		"defaultMessageNotifications",
 		"id",
 		"maximumBitrate",

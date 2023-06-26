@@ -32,3 +32,4 @@ export function cmdGetString(validate) {
 	}
 }
 
+export const Clean4FS = str => str.toLowerCase().replaceAll(/[\\\/\[\]\:\¦\<\>\+\=\;\,\*\?\"]+/gm, "_");
