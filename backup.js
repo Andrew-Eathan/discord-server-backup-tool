@@ -59,6 +59,10 @@ async function MarkChannelAsSaved(db, id) {
 	await db.Execute("INSERT INTO finishedchannels (id) VALUES (?)", id);
 }
 
+export async function GetUserByID(bot, id) {
+    return await bot.users.fetch(id).catch(_ => null);
+}
+
 export default async function startBackup(bot, selGuild, selChans, allCategories, allChannels, options, saveFolder) {
 	process.on('SIGINT', SIGINT);
 	BackupActive = true;
@@ -129,7 +133,7 @@ export default async function startBackup(bot, selGuild, selChans, allCategories
 		await SaveMembers(auxdb, members, selGuild, options);
 	}
 
-	await SaveMessages(auxdb, messages, selChans, options);
+	await SaveMessages(auxdb, messages, selChans, options, members, bot);
 
 	print("Backup complete!\nWaiting 3 seconds for all remaining async SQL queries to finish and then quitting. Your backup is available in the folder \"" + folder + "\"!")
 
@@ -138,7 +142,7 @@ export default async function startBackup(bot, selGuild, selChans, allCategories
 	process.exit();
 }
 
-async function FetchAllMessages(messages, channel, saveOptions, messagesSaved) {
+async function FetchAllMessages(messages, channel, saveOptions, messagesSaved, members, bot) {
 	let fetchAmount = 100
 	let options = { limit: fetchAmount };
 
@@ -226,6 +230,34 @@ async function FetchAllMessages(messages, channel, saveOptions, messagesSaved) {
 			savekeys.push("referenceGuildId"); savedata.push(msg.reference?.guildId);
 			savekeys.push("referenceMessageId"); savedata.push(msg.reference?.messageId);
 
+            // check if this message's author exists in the members and nonmembers table
+            // if not, add them to the non-members table
+            if (members) {
+                let authorMem = await members.Execute("SELECT * FROM members WHERE id = ?", [msg.author.id]);
+                if (!authorMem) {
+                    print("not ", msg.author.id)
+                    authorMem = await members.Execute("SELECT * FROM nonmembers WHERE id = ?", [msg.author.id]);
+
+                    if (!authorMem) {
+                        let user = await GetUserByID(bot, msg.author.id);
+                        if (!user) {
+                            user = {
+                                id: msg.author.id,
+                                deleted: true
+                            }
+                        }
+
+                        print(user);
+
+                        let keys = ["id", "username", "discriminator", "tag", "nickname", "createdTimestamp", "deleted", "bot", "system", "communicationDisabledTimestamp", "displayHexColor", "joinedTimestamp", "pending", "premiumSinceTimestamp", "avatar", "banner"]
+                        let values = [];
+                        for (let k of keys) values.push(user[k]);
+
+                        await members.Execute("INSERT INTO nonmembers (" + keys.join(", ") + ") VALUES (" + Array(keys.length).fill("?").join(", ") + ")", values);
+                    }
+                }
+            }
+
 			for (let key of messageKeysArr) {
 				if (typeof msg[key] != "undefined") {
 					savekeys.push(key);
@@ -305,7 +337,7 @@ async function FetchAllMessages(messages, channel, saveOptions, messagesSaved) {
 	return msgCount;
 }
 
-async function SaveMessages(auxdb, messages, selChans, options) {
+async function SaveMessages(auxdb, messages, selChans, options, members, bot) {
 	if ((await GetBackupInfo(auxdb, "savedMessages")) == "yes") {
 		print("Skipping message backup, since the loaded backup already did it.");
 		return;
@@ -344,7 +376,7 @@ async function SaveMessages(auxdb, messages, selChans, options) {
 				}
 
 				print(`Saving active thread "${pairs[1].name}" from channel #${chan.name}`);
-				messagesSaved += await FetchAllMessages(messages, pairs[1], options, messagesSaved);
+				messagesSaved += await FetchAllMessages(messages, pairs[1], options, messagesSaved, members);
 				MarkChannelAsSaved(auxdb, pairs[1].id);
 			}
 
@@ -356,7 +388,7 @@ async function SaveMessages(auxdb, messages, selChans, options) {
 				}
 
 				print(`Saving archived thread "${pairs[1].name}" from channel #${chan.name}`);
-				messagesSaved += await FetchAllMessages(messages, pairs[1], options, messagesSaved);
+				messagesSaved += await FetchAllMessages(messages, pairs[1], options, messagesSaved, bot);
 				MarkChannelAsSaved(auxdb, pairs[1].id);
 			}
 
@@ -366,7 +398,7 @@ async function SaveMessages(auxdb, messages, selChans, options) {
 		}
 
 		print(`Saving messages from channel #${chan.name}`);
-		messagesSaved += await FetchAllMessages(messages, chan, options, messagesSaved);
+		messagesSaved += await FetchAllMessages(messages, chan, options, messagesSaved, members, bot);
 		MarkChannelAsSaved(auxdb, chan.id);
 	}
 
@@ -444,6 +476,7 @@ async function SaveMembers(auxdb, members, selGuild, options) {
 	print("Saving members...")
 
 	await members.Execute("CREATE TABLE IF NOT EXISTS members (id text, username text, discriminator text, tag text, nickname text, createdTimestamp integer, bot integer, system integer, communicationDisabledTimestamp integer, displayHexColor text, joinedTimestamp integer, pending integer, premiumSinceTimestamp integer, avatar blob, banner blob)")
+	await members.Execute("CREATE TABLE IF NOT EXISTS nonmembers (id text, username text, discriminator text, tag text, nickname text, createdTimestamp integer, deleted integer, bot integer, system integer, communicationDisabledTimestamp integer, displayHexColor text, joinedTimestamp integer, pending integer, premiumSinceTimestamp integer, avatar blob, banner blob)")
 
 	let savekeys = [
 		"id",
@@ -520,9 +553,9 @@ async function SaveServerInfo(auxdb, serverinfo, selGuild, allChannels, allCateg
 	print("Saving server information...")
 	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS serverinfo (type text, data text)")
 	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS bans (id text, tag text, reason text)")
-	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS invites (code text, temporary integer, maxAge integer, uses integer, maxUses integer, inviterId text, createdAt integer, expiresAt integer, url text)")
-	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS emojis (id text, name text, animated integer, authorId text, createdAt integer, identifier text, requiresColons integer, url text, image blob)")
-	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS channels (name text, type text, id text, parentId text, position integer, rawPosition integer, createdAt integer, nsfw integer, lastMessageId text, topic text, rateLimitPerUser integer, bitrate integer, rtcRegion text, userLimit integer)")
+	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS invites (code text, temporary integer, maxAge integer, uses integer, maxUses integer, inviterId text, createdTimestamp integer, expiresAt integer, url text)")
+	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS emojis (id text, name text, animated integer, authorId text, createdTimestamp integer, identifier text, requiresColons integer, url text, image blob)")
+	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS channels (name text, type text, id text, parentId text, position integer, rawPosition integer, createdTimestamp integer, nsfw integer, lastMessageId text, topic text, rateLimitPerUser integer, bitrate integer, rtcRegion text, userLimit integer)")
 
 	print("Saving server settings...");
 
@@ -619,7 +652,7 @@ async function SaveServerInfo(auxdb, serverinfo, selGuild, allChannels, allCateg
 			imagedata = await GetLinkData(emoji.url + suffix)
 		}
 
-		await serverinfo.Execute("INSERT INTO emojis (id, name, animated, authorId, createdAt, identifier, requiresColons, url, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+		await serverinfo.Execute("INSERT INTO emojis (id, name, animated, authorId, createdTimestamp, identifier, requiresColons, url, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [
 			emoji?.id, // why are all of these nullable wtf discord
 			emoji?.name,
 			emoji?.animated,
@@ -647,15 +680,15 @@ async function SaveServerInfo(auxdb, serverinfo, selGuild, allChannels, allCateg
 		for (let pairs of invites) {
 			let invite = pairs[1];
 
-			await serverinfo.Execute("INSERT INTO invites (code, temporary, maxAge, uses, maxUses, inviterId, createdat, expiresat, url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+			await serverinfo.Execute("INSERT INTO invites (code, temporary, maxAge, uses, maxUses, inviterId, createdTimestamp, expiresAt, url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [
 				invite.code,
 				invite.temporary,
 				invite.maxAge,
 				invite.uses,
 				invite.maxUses,
 				invite.inviterId,
-				invite.createdAt,
-				invite.expiresat,
+				invite.createdTimestamp,
+				invite.expiresAt,
 				invite.url
 			])
 		}
@@ -684,7 +717,7 @@ async function SaveServerInfo(auxdb, serverinfo, selGuild, allChannels, allCateg
 		savekeys.push("parentId"); savedata.push(ch.parentId);
 		savekeys.push("position"); savedata.push(ch.position);
 		savekeys.push("rawPosition"); savedata.push(ch.rawPosition);
-		savekeys.push("createdAt"); savedata.push(ch.createdAt);
+		savekeys.push("createdTimestamp"); savedata.push(ch.createdTimestamp);
 		savekeys.push("nsfw"); savedata.push(ch.nsfw ? 1 : 0);
 		savekeys.push("topic"); savedata.push(ch.topic);
 		savekeys.push("lastMessageId"); savedata.push(ch.lastMessageId);
@@ -717,11 +750,11 @@ async function SaveServerInfo(auxdb, serverinfo, selGuild, allChannels, allCateg
 
 	print("Saving categories...");
 
-	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS categories (name text, type text, id text, position integer, rawposition integer, created integer)")
+	await serverinfo.Execute("CREATE TABLE IF NOT EXISTS categories (name text, type text, id text, position integer, rawPosition integer, createdTimestamp integer)")
 
 	for (let cat of Object.values(allCategories)) {
-		await serverinfo.Execute("INSERT INTO categories (name, type, id, position, rawposition, created) VALUES (?, ?, ?, ?, ?, ?)", [
-			cat.name, cat.type, cat.id, cat.position, cat.rawPosition, cat.createdAt
+		await serverinfo.Execute("INSERT INTO categories (name, type, id, position, rawPosition, createdTimestamp) VALUES (?, ?, ?, ?, ?, ?)", [
+			cat.name, cat.type, cat.id, cat.position, cat.rawPosition, cat.createdTimestamp
 		])
 	}
 
