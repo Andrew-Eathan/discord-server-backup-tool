@@ -28,18 +28,19 @@ self-explanatory, this tool saves almost all useful information of a server usin
 
 
 # Backup structure:
-A full backup has 5 SQL databases:
+For the most part, table column names are the same as the properties of the discord.js API objects.  
+A full backup has 5 SQL databases:  
 
 ### backupinfo.db
-This contains info relevant to the backup process itself, such as backup settings, a list of guild channels, and a list of channels whose messages have been fully backed up.
-It has 3 tables:
+This contains info relevant to the state of the backup process itself, such as backup settings, a list of guild channels, a list of channels whose messages have been fully backed up, and a list of steps that have been completed in the backup. Without this file, you can't resume an unfinished backup.  
+It has 3 tables:  
 #### `backupinfo (key text, value text)`
 #### `finishedchannels (id text)`
 #### `channels (id text)`
 
 ### serverinfo.db
-This contains server information such as server settings, bans list, invites list, emojis list, and a list of channels and categories.
-It has 6 tables:
+This contains server information such as server settings, bans list, invites list, emojis list, and a list of channels and categories.  
+It has 6 tables:  
 #### `serverinfo (type text, data text)`
 #### `bans (id text, tag text, reason text)`
 #### `invites (code text, temporary integer, maxAge integer, uses integer, maxUses integer, inviterId text, createdTimestamp integer, expiresAt integer, url text)`
@@ -48,7 +49,21 @@ It has 6 tables:
 #### `categories (name text, type text, id text, position integer, rawPosition integer, createdTimestamp integer)`
 
 ### roles.db
-Self-explanatory, contains all server roles
+Self-explanatory, contains all server roles  
+#### `roles (id text, name text, createdTimestamp integer, hoist integer, mentionable integer, tags string, position integer, rawPosition integer, hexColor text, unicodeEmoji text, icon text, permissions text)`
+#### `rolemembers (userId text, roleId text)`
+
+### members.db
+Contains a list of members, and optionally their profile pictures and banners too.  
+#### `members (id text, username text, discriminator text, tag text, nickname text, createdTimestamp integer, bot integer, system integer, communicationDisabledTimestamp integer, displayHexColor text, joinedTimestamp integer, pending integer, premiumSinceTimestamp integer, avatar blob, banner blob)`
+#### `nonmembers (id text, username text, discriminator text, tag text, nickname text, createdTimestamp integer, deleted integer, bot integer, system integer, communicationDisabledTimestamp integer, displayHexColor text, joinedTimestamp integer, pending integer, premiumSinceTimestamp integer, avatar blob, banner blob)`
+
+### messages.db
+The heart of the backup tool, contains a list of messages from the channels selected for backup, along with lists of the message attachments and embeds.  
+#### `messages (id text, authorId text, channelId text, applicationId text, type text, content text, createdTimestamp integer, editedTimestamp integer, hasThread integer, threadId text, embedCount integer, pinned integer, system integer, tts integer, activity text, attachmentCount integer, referenceChannelId text, referenceGuildId text, referenceMessageId text`
+#### `attachments (messageId text, attachmentId, contentType text, description text, duration real, ephemeral integer, width integer, height integer, id text, name text, size integer, spoiler integer)`
+#### `embeds (id text, author text, color integer, description text, fields text, footer text, hexColor text, image text, length integer, provider text, thumbnail text, timestamp text, title text, url text, video text)`  
+
 
 
   
