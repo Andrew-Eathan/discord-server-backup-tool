@@ -14,7 +14,7 @@ self-explanatory, this tool saves almost all useful information of a server usin
 - saves all relevant role information, including which members have which roles and role icons (if set)
 - saves all relevant server emoji information, including the emojis themselves
 - saves a list of the settings and properties of each channel in the guild, like position, name, and others
-- saves a list of guild members and all of their properties, also including their avatars and banners
+- saves a list of guild members and all of their properties, also including their avatars and banners. the tool also saves a list of users that are no longer in the server, as long as they've sent a message at some point
 - progressively saves every message each channel in the guild that you choose to backup, including the message embeds (optional) and the message attachment details (not the attachments themselves)
 - supports saving messages from the threads of a channel
 - also supports resuming the backup if anything happens, like a fatal script error or internet loss :)
@@ -25,8 +25,32 @@ self-explanatory, this tool saves almost all useful information of a server usin
 - doesn't save more than 100 active and 100 archived threads per channel, because it's a niche necessity that i don't really want to work on
 - doesn't save per-channel permissions, again, a niche necessity
 - doesn't save the guild's audit logs yet
-  
-SQL database information coming soon, for now you can look in backup.js to see what the table schemas are :)
+
+
+# Backup structure:
+A full backup has 5 SQL databases:
+
+### backupinfo.db
+This contains info relevant to the backup process itself, such as backup settings, a list of guild channels, and a list of channels whose messages have been fully backed up.
+It has 3 tables:
+#### `backupinfo (key text, value text)`
+#### `finishedchannels (id text)`
+#### `channels (id text)`
+
+### serverinfo.db
+This contains server information such as server settings, bans list, invites list, emojis list, and a list of channels and categories.
+It has 6 tables:
+#### `serverinfo (type text, data text)`
+#### `bans (id text, tag text, reason text)`
+#### `invites (code text, temporary integer, maxAge integer, uses integer, maxUses integer, inviterId text, createdTimestamp integer, expiresAt integer, url text)`
+#### `emojis (id text, name text, animated integer, authorId text, createdTimestamp integer, identifier text, requiresColons integer, url text, image blob)`
+#### `channels (name text, type text, id text, parentId text, position integer, rawPosition integer, createdTimestamp integer, nsfw integer, lastMessageId text, topic text, rateLimitPerUser integer, bitrate integer, rtcRegion text, userLimit integer)`
+#### `categories (name text, type text, id text, position integer, rawPosition integer, createdTimestamp integer)`
+
+### roles.db
+Self-explanatory, contains all server roles
+
+
   
 this tool supports using either bots for the backup, or user accounts!  
 i know the whole "selfbots bad!!!!!1" drill already, but keep in mind i'm making this tool not only for myself, but also for those who want to save their beloved servers in case Big Discord®™®™™ has anything to say about them, so use whatever you feel like using, in the end no one truly cares what you use  
