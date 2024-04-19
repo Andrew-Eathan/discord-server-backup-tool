@@ -376,7 +376,7 @@ async function SaveMessages(auxdb, messages, selChans, options, members, bot) {
 				}
 
 				print(`Saving active thread "${pairs[1].name}" from channel #${chan.name}`);
-				messagesSaved += await FetchAllMessages(messages, pairs[1], options, messagesSaved, members);
+				messagesSaved += await FetchAllMessages(messages, pairs[1], options, messagesSaved, members, bot);
 				MarkChannelAsSaved(auxdb, pairs[1].id);
 			}
 
@@ -388,7 +388,7 @@ async function SaveMessages(auxdb, messages, selChans, options, members, bot) {
 				}
 
 				print(`Saving archived thread "${pairs[1].name}" from channel #${chan.name}`);
-				messagesSaved += await FetchAllMessages(messages, pairs[1], options, messagesSaved, bot);
+				messagesSaved += await FetchAllMessages(messages, pairs[1], options, messagesSaved, members, bot);
 				MarkChannelAsSaved(auxdb, pairs[1].id);
 			}
 

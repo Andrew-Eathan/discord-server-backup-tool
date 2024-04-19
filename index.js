@@ -47,7 +47,7 @@ export async function SIGINT() {
 	console.log("Caught interrupt signal, closing " + original + " open databases...")
 
 	for (let i = original - 1; i >= 0; i--) {
-		await OpenDatabases[i].Close();
+		await OpenDatabases[i].Close().catch(e => console.log(`Failed to close database ${original - i}:`, e));
 		console.log(`${original - i} / ${original}`);
 	}
 
