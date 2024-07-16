@@ -223,6 +223,12 @@ async function FetchAllMessages(messages, channel, saveOptions, messagesSaved, m
 			let savekeys = [];
 			let savedata = [];
 
+			if (msg.webhookId != null) {
+				savekeys.push("webhookId"); savedata.push(msg.webhookId);
+				savekeys.push("webhookUsername"); savedata.push(msg.author.username);
+				savekeys.push("webhookAvatar"); savedata.push(msg.author.avatar);
+			}
+
 			savekeys.push("authorId"); savedata.push(msg.author.id);
 			savekeys.push("channelId"); savedata.push(msg.channel.id);
 
